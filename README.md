@@ -6,7 +6,7 @@
 
 Installation
 ------------
-Installed via pip using: ``pip install wifipasswords``
+
 
 Usage
 -----
