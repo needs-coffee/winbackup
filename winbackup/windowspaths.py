@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
-import os
 import sys
 import ctypes
 import ctypes.wintypes
@@ -22,8 +21,7 @@ import logging
 from uuid import UUID
 
 ## from https://gist.github.com/mkropat/7550097 
-## user https://github.com/mkropat
-## below GUID class is under MIT licence copyright  Michael Kropat (mkropat)
+## below GUID class is under MIT licence copyright Michael Kropat (https://github.com/mkropat)
 class GUID(ctypes.Structure):   # [1]
     _fields_ = [
         ("Data1", ctypes.wintypes.DWORD),
@@ -46,18 +44,7 @@ class WindowsPaths:
         Returns the current used folder path, not the default folder path.
         i.e. if the user default videos folder has been changed, it will return the new path.
         """
-
-        ##
-        # CISDL - old api method, deprecated since vista
-        self.SHGFP_TYPE_CURRENT = 0 # get the current folder location not the default one
-        self.CSIDL_PERSONAL = 5 # documents directory
-        self.CSIDL_MYPICTURES = 39
-        self.CSIDL_MYVIDEO = 14
-        self.CSIDL_MYMUSIC = 13
-        self.CSIDL_LOCAL_APPDATA = 28
-        self.CSIDL_DESKTOPDIRECTORY = 16
-
-        #https://docs.microsoft.com/en-us/windows/win32/shell/knownfolderid
+        # https://docs.microsoft.com/en-us/windows/win32/shell/knownfolderid
         # guids from windows API (KnownFolderID)
         self.FOLDERID_DOCUMENTS = "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}"
         self.FOLDERID_PICTURES = "{33E28130-4E1E-4676-835A-98395C3BC3BB}"
@@ -74,6 +61,7 @@ class WindowsPaths:
         self.FOLDERID_PROGRAMFILESX86 = "{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}"
 
         self.paths = {}
+
 
     def get_paths(self) -> dict:
         """
@@ -100,7 +88,7 @@ class WindowsPaths:
         return paths
         
 
-    def get_windows_path(self, known_folder_id) -> str:
+    def get_windows_path(self, known_folder_id:str) -> str:
         """
         Takes a known_folder_id GUID as per win32 API and returns the folder path.
         SHGetKnownFolderPath is the current maintained version supported by windows
@@ -109,7 +97,6 @@ class WindowsPaths:
         #KF_FLAG_DEFAULT_PATH by default is not set, so will return the current, not default path
         # https://docs.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid
         path = ''
-
         # below function adapted from https://gist.github.com/mkropat/7550097 - MIT licence
         buf = ctypes.c_wchar_p(ctypes.wintypes.MAX_PATH)
         try:
@@ -122,54 +109,12 @@ class WindowsPaths:
                 raise ValueError
             path = buf.value
             ctypes.windll.ole32.CoTaskMemFree(buf)
+            logging.debug(f'KnownFolderID {known_folder_id} Path {path}')
         
         except Exception as e:
-            logging.debug(f'{e}')
+            logging.error(f'{e}')
 
         return path
-    
-
-    def get_download_path(self) -> str:
-        """
-        return the path of the downloads directory.
-        This cannot use CSIDL as there is no ID for this.
-        DEPRICATED METHOD
-        dont use this registry key - there is a specific wanring in the registry
-        """
-        if os.name == 'nt':
-            import winreg
-            sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
-            downloads_guid = '{374DE290-123F-4565-9164-39C4925E467B}'
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
-                location = winreg.QueryValueEx(key, downloads_guid)[0]
-            return location
-
-
-    def get_saved_games_path(self) -> str:
-        """
-        return the path of the saved_games directory.
-        This cannot use CSIDL as there is no ID for this.
-        DEPRICATED METHOD
-        dont use this registry key - there is a specific wanring in the registry
-        """
-        if os.name == 'nt':
-            import winreg
-            sub_key = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'
-            downloads_guid = '{4C5C32FF-BB9D-43B0-B5B4-2D72E54EAAA4}'
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub_key) as key:
-                location = winreg.QueryValueEx(key, downloads_guid)[0]
-            return location
-
-
-    def get_cisdl_windows_path(self, csidl) -> str:
-        """
-        DEPRICATED METHOD
-        Depricated api since vista, also does not have all folders (downloads, savedgames)
-        """
-        buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-        ctypes.windll.shell32.SHGetFolderPathW(None, csidl, None, self.SHGFP_TYPE_CURRENT, buf)
-        return buf.value
-
 
 
 if __name__ == "__main__":
@@ -178,33 +123,8 @@ if __name__ == "__main__":
                     level = logging.DEBUG)
 
     windows_paths = WindowsPaths()
-
-    print('CISDL paths')
-    print(f'Documents  : {windows_paths.get_cisdl_windows_path(windows_paths.CSIDL_PERSONAL)}')
-    print(f'Pictures   : {windows_paths.get_cisdl_windows_path(windows_paths.CSIDL_MYPICTURES)}')
-    print(f'Videos     : {windows_paths.get_cisdl_windows_path(windows_paths.CSIDL_MYVIDEO)}')
-    print(f'Music      : {windows_paths.get_cisdl_windows_path(windows_paths.CSIDL_MYMUSIC)}')
-    print(f'appdata    : {windows_paths.get_cisdl_windows_path(windows_paths.CSIDL_LOCAL_APPDATA)}')
-    print(f'Destkop    : {windows_paths.get_cisdl_windows_path(windows_paths.CSIDL_DESKTOPDIRECTORY)}')
-    print(f'Downloads  : {windows_paths.get_download_path()}')
-    print(f'savedgames : {windows_paths.get_saved_games_path()}')
-    print()
-
-    print('get_paths method')
     paths = windows_paths.get_paths()
-    print(f'Documents    : {paths["documents"]}')
-    print(f'Pictures     : {paths["pictures"]}')
-    print(f'Videos       : {paths["videos"]}')
-    print(f'Music        : {paths["music"]}')
-    print(f'appdata      : {paths["local_appdata"]}')
-    print(f'Destkop      : {paths["desktop"]}')
-    print(f'Downloads    : {paths["downloads"]}')
-    print(f'savedgames   : {paths["savedgames"]}')
-    print(f'pub doc      : {paths["public_documents"]}')
-    print(f'prog data    : {paths["program_data"]}')
-    print(f'prog files   : {paths["program_files"]}')
-    print(f'prog files86 : {paths["program_files_x86"]}')
-    print()
-
-    print('Complete.')
+    for k, v in paths.items():
+        print(f'{k:<17} : {v}')
+    print('\nComplete.')
     sys.exit()
