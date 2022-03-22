@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
+from multiprocessing.sharedctypes import Value
 import sys
 import os
 import subprocess
@@ -74,6 +75,25 @@ class Zip7Archiver:
         # 7z normally disables progress reporting when output redirected, bsp1 fixes this.
         cmd_args = [self.zip7_path, 'a', '-t7z', '-m0=lzma2', f'-md={dict_size}', f'-mx={str(mx_level)}', '-bsp1']
             # add additional arguments depending on function arguments
+
+        if not type(filename) == str:
+            raise TypeError("Filename must be a string")
+
+        if type(in_folder_path) == str:
+            if not os.path.exists(in_folder_path):
+                raise FileNotFoundError() 
+        elif type(in_folder_path) == list:
+            for path in in_folder_path:
+                if not os.path.exists(path):
+                    raise FileNotFoundError()
+        else:
+            raise TypeError("in_folder_path must be string or list")
+
+        if type(out_folder) == str:
+            if not os.path.exists(out_folder):
+                raise FileNotFoundError()
+        else:
+            raise TypeError("output path must be a string")
 
         # add additional flags
         if split or split_force:

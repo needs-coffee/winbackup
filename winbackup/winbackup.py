@@ -255,23 +255,36 @@ class WinBackup:
                 filename = self._create_filename(target['name'].replace(' ', ''))
               
                 if target['type'] == 'folder':
-                    self.archiver.backup_folder(filename,
-                                                target['path'], out_path, passwd, dict_size=target['dict_size'], 
-                                                mx_level=target['mx_level'], full_path=target['full_path'], quiet=quiet)
+                    try:
+                        self.archiver.backup_folder(filename,
+                                                    target['path'], out_path, passwd, dict_size=target['dict_size'], 
+                                                    mx_level=target['mx_level'], full_path=target['full_path'], quiet=quiet)
+                    except Exception as e:
+                        logging.error(f"backup {filename} failed. Exception: {e}")
+                        print(Fore.RED + f" XX - Backup {filename} failed. See logs."  + Style.RESET_ALL)
                 else:
                     if key == '01_config':
                         config_path = os.path.join(out_path, 'config')
                         os.mkdir(config_path)
                         self.config_saver.save_config_files(config_path, quiet=quiet)
-                        self.archiver.backup_folder(filename,
+                        try: 
+                            self.archiver.backup_folder(filename,
                                                     config_path, out_path, passwd, dict_size=target['dict_size'], 
                                                     mx_level=target['mx_level'], full_path=target['full_path'], quiet=quiet)
+                        except Exception as e:
+                            logging.error(f"backup {filename} failed. Exception: {e}")
+                            print(Fore.RED + f" XX - Backup {filename} failed. See logs."  + Style.RESET_ALL)
+                        
                         send2trash(config_path)
                         
                     elif key == '30_plexserver':
-                        self.archiver.backup_plex_folder(self._create_filename(target['name'].replace(' ','')),
-                                                    target['path'], out_path, passwd, dict_size=target['dict_size'],
-                                                    mx_level=target['mx_level'], quiet=quiet)
+                        try:
+                            self.archiver.backup_plex_folder(self._create_filename(target['name'].replace(' ','')),
+                                                        target['path'], out_path, passwd, dict_size=target['dict_size'],
+                                                        mx_level=target['mx_level'], quiet=quiet)
+                        except Exception as e:
+                            logging.error(f"backup {filename} failed. Exception: {e}")
+                            print(Fore.RED + f" XX - Backup {filename} failed. See logs."  + Style.RESET_ALL)                                                        
                     elif key == '32_hypervvms':
                         pass
                     elif key == '33_onenote':
