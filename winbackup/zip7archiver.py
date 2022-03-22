@@ -19,7 +19,7 @@ import os
 import subprocess
 import logging
 from tqdm import tqdm
-from colorama import Fore, Back, Style, init
+from colorama import Fore, Style
 from send2trash import send2trash
 from typing import Union
 
@@ -35,7 +35,7 @@ class Zip7Archiver:
 
 
     @staticmethod
-    def _get_path_size(path) -> int:
+    def _get_path_size(path:str) -> int:
         """
         Calculate the size of a directory tree and return size in bytes.
         """
@@ -44,8 +44,9 @@ class Zip7Archiver:
             for file in files:
                 try:
                     total_bytes += os.path.getsize(os.path.join(path, file))
+                    logging.debug(f"Pathsize: {path} Size: {total_bytes}")
                 except Exception as e:
-                    logging.debug(f'Get pathsize error - {e}')
+                    logging.error(f"Get pathsize exception - Path: {path} Exception: {e}")
         return total_bytes
 
 
@@ -71,13 +72,13 @@ class Zip7Archiver:
         """
         # base args for all types
         # 7z normally disables progress reporting when output redirected, bsp1 fixes this.
-        cmd_args = [self.zip7_path, "a", "-t7z", "-m0=lzma2", f"-md={dict_size}", f"-mx={str(mx_level)}", "-bsp1"]
+        cmd_args = [self.zip7_path, 'a', '-t7z', '-m0=lzma2', f'-md={dict_size}', f'-mx={str(mx_level)}', '-bsp1']
             # add additional arguments depending on function arguments
 
         # add additional flags
         if split or split_force:
             if split_force:
-                logging.debug(f'split_force specified - Backup {filename} Will Split.')
+                logging.debug(f"split_force specified - {filename} will be split.")
                 cmd_args.append('-v4092m')
             else:
                 # only split if the output directory will be larger than the volume size. 
@@ -85,12 +86,12 @@ class Zip7Archiver:
                 if type(in_folder_path) is str:
                     path_size = self._get_path_size(in_folder_path)
                     if path_size >= 4290772992:
-                        logging.debug(f'backup_folder - if split - Backup {filename} is > volume split limit of 4092m (path is {path_size/1048576:0.0f} MiB). Will Split.')
+                        logging.debug(f"Splitting - {filename} is > split limit of 4092m (path size: {path_size/1048576:0.0f} MiB).")
                         cmd_args.append('-v4092m')
                     else:
-                        logging.debug(f"backup_folder - if split - Backup {filename} is < volume split limit of 4092m (path is {path_size/1048576:0.0f} MiB). Won't Split.")
+                        logging.debug(f"Not Splitting - {filename} is < split limit of 4092m (path size: {path_size/1048576:0.0f} MiB).")
                 else:
-                    logging.debug('backup_folder - if split - List of paths given, therefore split the archives.')
+                    logging.debug("List of paths given - Splitting.")
                     cmd_args.append('-v4092m')
         if len(password) != 0:
             cmd_args.append('-mhe=on')
@@ -114,10 +115,10 @@ class Zip7Archiver:
             with subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
                                     shell=False, bufsize=1, universal_newlines=True) as p:
                 with tqdm(total=100, colour='Cyan', leave=False, desc=f' Compressing ', unit='%') as pbar:
-                    logging.debug('progress bar started')
+                    logging.debug("progress bar started")
                     for line in p.stdout:
                         if len(line.strip()) != 0:
-                            logging.debug('backup_folder line output: ' + line.strip())
+                            logging.debug("backup_folder line output: " + line.strip())
                         if "Add new data to archive: " in line:
                             tqdm.write(Fore.CYAN + f" >> Data to compress: {line.split('Add new data to archive: ')[1].strip()}" + Style.RESET_ALL)
                             logging.info(f"{filename} data to compress: {line.split('Add new data to archive: ')[1].strip()}")
@@ -127,9 +128,9 @@ class Zip7Archiver:
                         if "%" in line:
                             pbar.update(int(line.split('%')[0].strip()) - pbar.n)
         except Exception as e:
-            logging.debug(f'backup_folder function raised exception: {e}')
-            print(Fore.RED + f' XX - Failed to backup {filename}. Set log level to debug for info.' + Style.RESET_ALL)
-            logging.error(f'backup_folder - Failed to backup {filename}. Set log level to debug for info.')
+            logging.debug(f"Backup failed - File: {filename} Exception: {e}")
+            print(Fore.RED + f" XX - Failed to backup {filename}. Set log level to debug for info." + Style.RESET_ALL)
+            logging.error(f'Failed to backup {filename}. Set log level to debug for info.')
 
 
     def backup_plex_folder(self, filename:str, in_folder_path:str, out_folder:str, 
@@ -139,7 +140,7 @@ class Zip7Archiver:
         tar_filename = filename[:-3] + '.tar'
 
         # create tar with tqdm progress bar
-        cmd_args = [self.zip7_path, "a", "-ttar", "-bsp1", "-xr!Cache*", "-xr!Updates", "-xr!Crash*", 
+        cmd_args = [self.zip7_path, 'a', '-ttar', '-bsp1', '-xr!Cache*', '-xr!Updates', '-xr!Crash*', 
                     os.path.join(out_folder, tar_filename), in_folder_path]
         
         with subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False,
@@ -167,6 +168,10 @@ class Zip7Archiver:
 
 
     def backup_onenote_files(self, out_folder:str, password:str='') -> None:
+        """
+        CURRENTLY NOT WORKING CORRECTLY.
+        Needs OneNote 2016 (not Microsoft Store OneNote), Word 2016 and OneNoteMdExporter.
+        """
 
         working_dir = os.getcwd()
 
@@ -212,12 +217,6 @@ class Zip7Archiver:
 
     def backup_hyperv(self) -> None:
         pass
-
-
-    def backup_virtualbox(self) -> None:
-        pass
-
-
 
 
 if __name__ == '__main__':
