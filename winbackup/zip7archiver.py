@@ -52,7 +52,7 @@ class Zip7Archiver:
 
     def backup_folder(self, filename:str, in_folder_path:Union[str,list], out_folder:str, 
                     password:str='', dict_size:str='192m', mx_level:int=9, full_path:bool=False, 
-                    split:bool=True, split_force:bool=False) -> None:
+                    split:bool=True, split_force:bool=False, quiet:bool=False) -> None:
         """
         Main function for creating 7z archives.
         Uses TQDM to display the progress to the console.
@@ -65,7 +65,7 @@ class Zip7Archiver:
         - mx_level       : LZMA2 compression level  0-9 (9 is max)
         - full_path      : archive will store the full path to the archived files, useful if multiple directories from several volumes
         - split          : if the archives should be split into separate files if larger than FAT32 limit.
-        - split_force    : dont check if archive will be larger than FAT32 limit, just force splitting.
+        - split_force    : don't check if archive will be larger than FAT32 limit, just force splitting.
         
         Returns:
         - None
@@ -114,27 +114,34 @@ class Zip7Archiver:
         try:
             with subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
                                     shell=False, bufsize=1, universal_newlines=True) as p:
-                with tqdm(total=100, colour='Cyan', leave=False, desc=f' Compressing ', unit='%') as pbar:
-                    logging.debug("progress bar started")
+                if not quiet:
+                    with tqdm(total=100, colour='Cyan', leave=False, desc=f' Compressing ', unit='%') as pbar:
+                        logging.debug("progress bar started")
+                        for line in p.stdout:
+                            if len(line.strip()) != 0:
+                                logging.debug("backup_folder line output: " + line.strip())
+                            if "Add new data to archive: " in line:
+                                tqdm.write(Fore.CYAN + f" >> Data to compress: {line.split('Add new data to archive: ')[1].strip()}" + Style.RESET_ALL)
+                                logging.info(f"{filename} data to compress: {line.split('Add new data to archive: ')[1].strip()}")
+                            if "Archive size: " in line:
+                                tqdm.write(Fore.CYAN + f" >> Compressed Size : {line.split('Archive size: ')[1].strip()}" + Style.RESET_ALL)
+                                logging.info(f"{filename} Compressed Size: {line.split('Archive size: ')[1].strip()}")
+                            if "%" in line:
+                                pbar.update(int(line.split('%')[0].strip()) - pbar.n)
+                else:
                     for line in p.stdout:
                         if len(line.strip()) != 0:
-                            logging.debug("backup_folder line output: " + line.strip())
-                        if "Add new data to archive: " in line:
-                            tqdm.write(Fore.CYAN + f" >> Data to compress: {line.split('Add new data to archive: ')[1].strip()}" + Style.RESET_ALL)
-                            logging.info(f"{filename} data to compress: {line.split('Add new data to archive: ')[1].strip()}")
-                        if "Archive size: " in line:
-                            tqdm.write(Fore.CYAN + f" >> Compressed Size : {line.split('Archive size: ')[1].strip()}" + Style.RESET_ALL)
-                            logging.info(f"{filename} Compressed Size: {line.split('Archive size: ')[1].strip()}")
-                        if "%" in line:
-                            pbar.update(int(line.split('%')[0].strip()) - pbar.n)
+                            logging.debug("Backup line output: " + line.strip())
+                        
         except Exception as e:
             logging.debug(f"Backup failed - File: {filename} Exception: {e}")
-            print(Fore.RED + f" XX - Failed to backup {filename}. Set log level to debug for info." + Style.RESET_ALL)
+            if not quiet:
+                print(Fore.RED + f" XX - Failed to backup {filename}. Set log level to debug for info." + Style.RESET_ALL)
             logging.error(f'Failed to backup {filename}. Set log level to debug for info.')
 
 
     def backup_plex_folder(self, filename:str, in_folder_path:str, out_folder:str, 
-                            password:str='', dict_size:str='128m', mx_level:int=5) -> None:
+                            password:str='', dict_size:str='128m', mx_level:int=5, quiet:bool=False) -> None:
         # From testing - backing up plex database mx9 md128m takes 10gb of ram, mx9 md192m fails memory allocation on 16gb pc.
         #plex server files should be tarballed before compression as compressing disk files causes issues when restoring.
         tar_filename = filename[:-3] + '.tar'
@@ -145,18 +152,23 @@ class Zip7Archiver:
         
         with subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False,
                             bufsize=1, universal_newlines=True) as p:
-            with tqdm(total=100, colour='Cyan', leave=False, desc=f' Tarballing PMS ', unit='%') as pbar:
+            if not quiet:
+                with tqdm(total=100, colour='Cyan', leave=False, desc=f' Tarballing PMS ', unit='%') as pbar:
+                    for line in p.stdout:
+                        if len(line.strip()) != 0:
+                            logging.debug(line.strip())
+                        if "Add new data to archive: " in line:
+                            tqdm.write(Fore.CYAN + f" >> Data to tarball : {line.split('Add new data to archive: ')[1].strip()}" + Style.RESET_ALL)
+                            logging.info(f"{filename} data to tarball: {line.split('Add new data to archive: ')[1].strip()}")
+                        if "Archive size: " in line:
+                            tqdm.write(Fore.CYAN + f" >> Tarball Size    : {line.split('Archive size: ')[1].strip()}" + Style.RESET_ALL)
+                            logging.info(f"{filename} Tarball Size : {line.split('Archive size: ')[1].strip()}")
+                        if "%" in line:
+                            pbar.update(int(line.split('%')[0].strip()) - pbar.n)
+            else:
                 for line in p.stdout:
                     if len(line.strip()) != 0:
-                        logging.debug(line.strip())
-                    if "Add new data to archive: " in line:
-                        tqdm.write(Fore.CYAN + f" >> Data to tarball : {line.split('Add new data to archive: ')[1].strip()}" + Style.RESET_ALL)
-                        logging.info(f"{filename} data to tarball: {line.split('Add new data to archive: ')[1].strip()}")
-                    if "Archive size: " in line:
-                        tqdm.write(Fore.CYAN + f" >> Tarball Size    : {line.split('Archive size: ')[1].strip()}" + Style.RESET_ALL)
-                        logging.info(f"{filename} Tarball Size : {line.split('Archive size: ')[1].strip()}")
-                    if "%" in line:
-                        pbar.update(int(line.split('%')[0].strip()) - pbar.n)
+                        logging.debug("Backup line output: " + line.strip())
         
         # compress the tar
         self.backup_folder(filename, os.path.join(out_folder, tar_filename), out_folder, 

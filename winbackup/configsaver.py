@@ -45,13 +45,17 @@ class ConfigSaver:
         self.videos_path = videos_path
 
 
-    def save_config_files(self, out_path:str=None) -> str:
+    def save_config_files(self, out_path:str=None, quiet:bool=False) -> str:
         """
         Save all the configuration elements.
         Returns the path the files were saved to.
         """
         if out_path == None:
             out_path = self.config_save_path
+
+        if quiet:
+            null_dev = open(os.devnull, 'w')
+            sys.stdout = null_dev
 
         self.save_winfetch(out_path)
         self.save_installed_programs(out_path)
@@ -66,6 +70,10 @@ class ConfigSaver:
         self.save_systeminfo(out_path)
         self.save_battery_report(out_path)
 
+        if quiet:
+            sys.stdout = sys.__stdout__
+            null_dev.close()
+        
         return out_path
 
 
@@ -110,7 +118,7 @@ class ConfigSaver:
             with open(os.path.join(out_path, 'choco_packages.txt'), 'w') as out_file:
                 out_file.write(choco_output)
             print(' > Choco Packages saved.')
-            logging.info('Choco Pacakges Saved.')
+            logging.info('Choco Packages Saved.')
         except Exception as e:
             print(Fore.RED + ' XX Unable to backup choco packages.' + Style.RESET_ALL)
             logging.warning(f'Unable to save choco packages. Exception: {e}')
@@ -227,7 +235,7 @@ if __name__ == '__main__':
                         format='%(asctime)s - %(levelname)s - %(message)s',
                         level = logging.DEBUG)
 
-    # ?use pathlib to recursivley create path without if statement
+    # ?use pathlib to recursively create path without if statement
     if not os.path.isdir(os.path.join('.','tmp_test', 'config')):
         os.makedirs(os.path.join('.', 'tmp_test', 'config'))
 

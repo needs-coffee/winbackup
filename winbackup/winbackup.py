@@ -246,42 +246,46 @@ class WinBackup:
         print()      
  
 
-    def backup_run(self, config:dict, out_path:str, passwd:str, quiet_output=False) -> None:
+    def backup_run(self, config:dict, out_path:str, passwd:str, quiet:bool=False) -> None:
         for key, target in sorted(config.items()):
             if target['enabled']:
-                print(Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL)
+                if not quiet: 
+                    print(Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL)
                 logging.info(f"Backup starting - {target['name']}")
                 filename = self._create_filename(target['name'].replace(' ', ''))
               
                 if target['type'] == 'folder':
                     self.archiver.backup_folder(filename,
                                                 target['path'], out_path, passwd, dict_size=target['dict_size'], 
-                                                mx_level=target['mx_level'], full_path=target['full_path'])
+                                                mx_level=target['mx_level'], full_path=target['full_path'], quiet=quiet)
                 else:
                     if key == '01_config':
                         config_path = os.path.join(out_path, 'config')
                         os.mkdir(config_path)
-                        self.config_saver.save_config_files(config_path)
+                        self.config_saver.save_config_files(config_path, quiet=quiet)
                         self.archiver.backup_folder(filename,
                                                     config_path, out_path, passwd, dict_size=target['dict_size'], 
-                                                    mx_level=target['mx_level'], full_path=target['full_path'])
+                                                    mx_level=target['mx_level'], full_path=target['full_path'], quiet=quiet)
                         send2trash(config_path)
                         
                     elif key == '30_plexserver':
                         self.archiver.backup_plex_folder(self._create_filename(target['name'].replace(' ','')),
                                                     target['path'], out_path, passwd, dict_size=target['dict_size'],
-                                                    mx_level=target['mx_level'])
+                                                    mx_level=target['mx_level'], quiet=quiet)
                     elif key == '32_hypervvms':
                         pass
                     elif key == '33_onenote':
                         pass
-                print(f" >> {target['name']} saved to 7z - {filename}")
+                if not quiet:
+                    print(f" >> {target['name']} saved to 7z - {filename}")
                 logging.debug(f"Backup finished for - {target['name']} - filename: {filename}")
-        print()
-        print(Fore.GREEN + " >>> Saving File hashes ... " + Style.RESET_ALL)
+        if not quiet: 
+            print()
+            print(Fore.GREEN + " >>> Saving File hashes ... " + Style.RESET_ALL)
         self._save_file_hashes(out_path)
-        print(" >> SHA-256 hashes of all archive files saved to sha256.txt")
-        logging.info("SHA-256 hashes of all archive files saved to sha256.txt")
+        if not quiet: 
+            print(" >> SHA-256 hashes of all archive files saved to sha256.txt")
+            logging.info("SHA-256 hashes of all archive files saved to sha256.txt")
 
         if not len(passwd) == 0:
             with open(os.path.join(out_path, "Archives_are_encrypted.txt"), 'w') as file:
@@ -340,5 +344,5 @@ class WinBackup:
         print('-' * 40)
         print()
 
-        self.backup_run(self.config, self.output_path, self.passwd)
+        self.backup_run(self.config, self.output_path, self.passwd, False)
         self.cli_exit(output_path, start_time)
