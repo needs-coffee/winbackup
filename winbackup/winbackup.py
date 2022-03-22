@@ -244,9 +244,9 @@ class WinBackup:
             print(Fore.YELLOW + " !! CAUTION - The backup target is an existing directory - The existing contents of the directory may be destroyed if you proceed." + Style.RESET_ALL)
         print(" Archives produced are split into 4092Mb volumes (FAT32 limitation).")
         print()      
+ 
 
-
-    def backup_run(self, config:dict, out_path:str, passwd:str) -> None:
+    def backup_run(self, config:dict, out_path:str, passwd:str, quiet_output=False) -> None:
         for key, target in sorted(config.items()):
             if target['enabled']:
                 print(Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL)
