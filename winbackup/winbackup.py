@@ -21,7 +21,9 @@ import logging
 import ctypes
 import getpass
 import hashlib
+import subprocess
 from datetime import datetime
+from tkinter import Listbox
 from send2trash import send2trash
 from colorama import Fore, Back, Style, init
 from pathlib import Path
@@ -51,6 +53,7 @@ class WinBackup:
         self.paths = self.windows_paths.get_paths()
         self.start_time = datetime.now()
         self.passwd = ''
+        self.hyperv_paths_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scripts', 'hyperv_paths.ps1')
 
         # Each backup target is a dictionary, use the config list to interate over
         # name - target name, will also be used to derive the output folder name
@@ -72,31 +75,29 @@ class WinBackup:
         '30_plexserver': {'name': 'Plex Server', 'type': 'special', 'path': os.path.join(self.paths['local_appdata'], 'Plex Media Server'), 'enabled': False, 'hidden': not self._plex_possible(self.paths), 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '31_virtualboxvms': {'name': 'VirtualBox VMs', 'type': 'folder', 'path': os.path.join(os.path.expanduser('~'), 'VirtualBox VMs'), 'enabled': False, 'hidden': not self._virtualbox_possible(self.paths), 'dict_size': '128m', 'mx_level': 9, 'full_path': False},
         '32_hypervvms': {'name': 'HyperV VMs', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': True, 'dict_size': '128m', 'mx_level': 9, 'full_path': True},
-        '33_onenote': {'name': 'Onenote', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': True, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '33_onenote': {'name': 'Onenote', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': not self._onenote_possible(), 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         }
 
         self.config_saver.set_videos_directory_path(self.config['14_videos']['path'])
+
+        if self.check_if_admin() and self._hyperv_possible():
+            logging.debug('HyperV is possible.')
+            self.config['32_hypervvms']['path'] = self._get_hyperv_paths()
+            self.config['32_hypervvms']['hidden'] = False
+ 
         signal.signal(signal.SIGINT, self._ctrl_c_handler)
+
+
+    @staticmethod
+    def _command_runner(shell_commands:list) -> str:
+        logging.debug(f'Command runner cmds: {shell_commands}')
+        return subprocess.run(shell_commands, stdout=subprocess.PIPE).stdout.decode('utf-8', errors='ignore')
 
 
     def _ctrl_c_handler(self, signum, frame):
         print()
         print(Fore.RED + " Ctrl-C received - Exiting." + Style.RESET_ALL)
         sys.exit(1)        
-
-
-    def _plex_possible(self, paths:list) -> bool:
-        if os.path.exists(os.path.join(paths['local_appdata'], 'Plex Media Server')):
-            return True
-        else:
-            return False
-
-
-    def _virtualbox_possible(self, paths:list) -> bool:
-        if os.path.exists(os.path.join(os.path.expanduser('~'), 'VirtualBox VMs')):
-            return True
-        else:
-            return False
 
 
     def _start_logger(self, log_level, output_path:str):
@@ -113,6 +114,60 @@ class WinBackup:
         
         logging.info("WINDOWS BACKUP - v" + __version__)
         logging.info(f"Output Folder: {output_path}") 
+
+
+    def _plex_possible(self, paths:list) -> bool:
+        if os.path.exists(os.path.join(paths['local_appdata'], 'Plex Media Server')):
+            return True
+        else:
+            return False
+
+
+    def _virtualbox_possible(self, paths:list) -> bool:
+        if os.path.exists(os.path.join(os.path.expanduser('~'), 'VirtualBox VMs')):
+            return True
+        else:
+            return False
+
+
+    def _hyperv_possible(self) -> bool:
+        """
+        the vmcompute service is required by hyper-v, so check if it exists.
+        """
+        response = self._command_runner(['powershell.exe', 'Get-Service', 'vmcompute']).split('\r\n')[0]
+        if "Cannot find any service with service name" in response:
+            return False
+        else:
+            return True
+
+
+    def _onenote_possible(self) -> bool:
+        #placeholder
+        return False
+
+
+    def _plex_server_running(self) -> bool:
+        response = self._command_runner(['powershell.exe', 'Get-Process', '"Plex Media Server"']).split('\r\n')[0]
+        if "Cannot find a process with the name" in response:
+            return False
+        else:
+            return True
+
+
+    def _get_hyperv_paths(self) -> list:
+        """
+        Needs to be run as admin
+        """
+        response = self._command_runner(['powershell.exe', self.hyperv_paths_script]).split('\r\n')
+        paths = list(filter(None, response))
+        if 'is not recognized as a name of a cmdlet' in paths[0]:
+            logging.error('HyperV not installed')
+        elif 'You do not have the required permission' in paths[0]:
+            logging.error('HyperV tools need to be run as admin.')
+            raise PermissionError("HyperV needs to be run as admin")
+        else:
+            logging.debug(f"HyperV Paths: {paths}")
+        return paths
 
 
     @staticmethod
@@ -259,8 +314,15 @@ class WinBackup:
         if len(passwd) <= 12 and len(passwd)!= 0:
             print(Fore.YELLOW + f" !! CAUTION - The given password is short. Consider a longer password." + Style.RESET_ALL)
         if not path_created:
-            print(Fore.YELLOW + " !! CAUTION - The backup target is an existing directory - The existing contents of the directory may be destroyed if you proceed." + Style.RESET_ALL)
-        print(" Archives produced are split into 4092Mb volumes (FAT32 limitation).")
+            print(Fore.YELLOW + " !! CAUTION - Output directory already exists - Contents may be destroyed if you proceed." + Style.RESET_ALL)
+        if config['30_plexserver']['enabled'] and self._plex_server_running():
+            print(Fore.YELLOW + " !! CAUTION - Plex Media Server is running - Recommend stopping Plex Server before backing up." + Style.RESET_ALL)
+        if config['32_hypervvms']['enabled']:
+            print(Fore.YELLOW + " !! CAUTION - HyperV has been enabled - Please check VMs are stopped before running." + Style.RESET_ALL)
+        if self._hyperv_possible() and not self.check_if_admin():
+            print(Fore.CYAN + " -- INFO - HyperV detected on system. To backup HyperV run winbackup as admin." + Style.RESET_ALL)
+
+        print(Fore.CYAN + " -- INFO - Archives produced are split into 4092Mb volumes (FAT32 limitation)." + Style.RESET_ALL)
         print()      
  
 

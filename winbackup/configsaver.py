@@ -164,9 +164,9 @@ class ConfigSaver:
 
     def save_videos_directory_filenames(self, out_path:str, videos_path:str) -> None:
         logging.debug(f'Videos file list directory: {videos_path}')
-        installed_output = self._command_runner(['powershell.exe', 'tree', videos_path]).replace('\r\n', '\n')
+        response = self._command_runner(['powershell.exe', 'tree', videos_path]).replace('\r\n', '\n')
         with open(os.path.join(out_path, 'videos_tree.txt'), 'w') as out_file:
-            out_file.write(installed_output)
+            out_file.write(response)
         print(' > Videos file list saved.')
         logging.info('Video Files list Saved.')
 
