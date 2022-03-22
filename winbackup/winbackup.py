@@ -76,7 +76,7 @@ class WinBackup:
 
     def _ctrl_c_handler(self, signum, frame):
         print()
-        print(Fore.RED + ' Ctrl-C received - Exiting.' + Style.RESET_ALL)
+        print(Fore.RED + " Ctrl-C received - Exiting." + Style.RESET_ALL)
         sys.exit(1)        
 
 
@@ -95,7 +95,10 @@ class WinBackup:
 
 
     @staticmethod
-    def check_if_admin():
+    def check_if_admin() -> bool:
+        """
+        Returns if the program is executed with admin privileges. 
+        """
         try:
             is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin() != 0)
         except:
@@ -106,14 +109,14 @@ class WinBackup:
     @staticmethod
     def _yes_no_prompt(question:str) -> bool:
         while (1):
-            print(Fore.GREEN + ' > ' + question+' (y/n): ' + Style.RESET_ALL, end='')
+            print(Fore.GREEN + " > " + question + " (y/n): " + Style.RESET_ALL, end='')
             reply = str(input()).lower().strip()
             if reply in {'yes', 'ye', 'y'}:
                 return True
             elif reply in {'no', 'n'}:
                 return False
             else:
-                print(Fore.RED + ' Only yes or no permitted. Ctrl+C to exit.' + Style.RESET_ALL)
+                print(Fore.RED + " Only yes or no permitted. Ctrl+C to exit." + Style.RESET_ALL)
 
 
     @staticmethod
@@ -125,7 +128,7 @@ class WinBackup:
 
 
     @staticmethod
-    def _create_output_directory(output_dir) -> tuple[str, str, bool]:
+    def _create_output_directory(output_dir:str) -> tuple[str, str, bool]:
         """
         takes the tgt output dir and creates an output path
         returns the path and folder_name and a flag indicating if the path needed created.
@@ -145,7 +148,7 @@ class WinBackup:
 
 
     @staticmethod
-    def _save_file_hashes(out_path):
+    def _save_file_hashes(out_path:str) -> None:
         hashes_list = []
         for file in os.listdir(out_path):
             if not file.endswith('.log') and not file.endswith('.txt'):
@@ -156,7 +159,7 @@ class WinBackup:
                     for n in iter(lambda: f.readinto(mv), 0):
                         h.update(mv[:n])
                 hashes_list.append((file, h.hexdigest()))
-                logging.debug(f' Hash {file} {h.hexdigest()}')
+                logging.debug(f" Hash {file} {h.hexdigest()}")
         with open(os.path.join(out_path, 'sha256.txt'), 'w') as hash_file:
             for item in hashes_list:
                 hash_file.write(f'{item[0]} {item[1]}\n')
@@ -180,18 +183,18 @@ class WinBackup:
         return False
 
 
-    def print_cli_header(self, output_path, output_folder_name, start_time):
-        logging.info('WINDOWS BACKUP - v' + __version__)
-        logging.info(f'Output Folder: {output_path}')
+    def print_cli_header(self, output_path:str, output_folder_name:str, start_time:datetime) -> None:
+        logging.info("WINDOWS BACKUP - v" + __version__)
+        logging.info(f"Output Folder: {output_path}")
 
-        print(Fore.BLACK + Back.WHITE + ' WINDOWS BACKUP - v' + __version__ + ' ' + Style.RESET_ALL)
-        print(Fore.GREEN + f' Backup started at     : ' + Style.RESET_ALL + f" {start_time.strftime('%Y-%m-%d %H:%M')}")
-        print(Fore.GREEN + f' Output filename style : ' + Style.RESET_ALL + f" {self._create_filename('example')}")
-        print(Fore.GREEN + f' Output folder         : ' + Style.RESET_ALL + f" {output_path}")
-        print(Fore.GREEN + f' Archives folder name  : ' + Style.RESET_ALL + f" {output_folder_name}")
+        print(Fore.BLACK + Back.WHITE + " WINDOWS BACKUP - v" + __version__ + " " + Style.RESET_ALL)
+        print(Fore.GREEN + f" Backup started at     : " + Style.RESET_ALL + f" {start_time.strftime('%Y-%m-%d %H:%M')}")
+        print(Fore.GREEN + f" Output filename style : " + Style.RESET_ALL + f" {self._create_filename('example')}")
+        print(Fore.GREEN + f" Output folder         : " + Style.RESET_ALL + f" {output_path}")
+        print(Fore.GREEN + f" Archives folder name  : " + Style.RESET_ALL + f" {output_folder_name}")
         print()
-        print(' A new folder will be created in the specified output folder with the above archive folder name.')
-        print(' All produced archives and files will be placed in this new folder.')
+        print(" A new folder will be created in the specified output folder with the above archive folder name pattern.")
+        print(" All produced archives and files will be placed in this new folder.")
         print()
 
 
@@ -199,7 +202,7 @@ class WinBackup:
         new_config = config.copy()
         for key, target in sorted(config.items()):
             if not target['hidden']:
-                new_config[key]['enabled'] = self._yes_no_prompt(f'Backup {target["name"]}?')
+                new_config[key]['enabled'] = self._yes_no_prompt(f"Backup {target['name']}?")
         print()
         return new_config
 
@@ -207,19 +210,18 @@ class WinBackup:
     def cli_get_password(self) -> str:
         passwd = ''
         while(1):
-            print(Fore.GREEN + f' > Password for encryption : ' + Style.RESET_ALL, end='')
+            print(Fore.GREEN + f" > Password for encryption : " + Style.RESET_ALL, end='')
             passwd = getpass.getpass(prompt='')
             if len(passwd) == 0:
-                print(' No password provided. 7z files produced will not be encrypted.')
+                print(" No password provided. 7z files produced will not be encrypted.")
                 break
             else:
-                print(Fore.GREEN + f' > Confirm encryption password: ' + Style.RESET_ALL,end='')
+                print(Fore.GREEN + f" > Confirm encryption password: " + Style.RESET_ALL, end='')
                 passwd_confirm = getpass.getpass(prompt='')
                 if passwd == passwd_confirm:
-                    logging.info('Archives will be encrypted.')
-                    print(f' Passwords match. 7z archives will be AES256 encrypted with the given password.')
-                    print(f' A blank text file will be produced in the output directory to indicate the archives are encrypted.')
-                    print(f' The archive headers will be encrypted (Filenames will be encrypted).')
+                    logging.info("Archives will be encrypted.")
+                    print(f" Passwords match. 7z archives will be AES256 encrypted with the given password.")
+                    print(f" The archive headers will be encrypted (Filenames will be encrypted).")
                     break
                 else:
                     print(Fore.RED + f" > passwords don't match - try again. " + Style.RESET_ALL)
@@ -231,20 +233,20 @@ class WinBackup:
         print(Fore.BLACK + Back.WHITE + " ** CONFIG SUMMARY ** " + Style.RESET_ALL + Fore.GREEN)
         for key, target in sorted(config.items()):
             if not target['hidden']:
-                print(f' Backup {target["name"]:<12} - {"Yes" if target["enabled"]==True else "No"}')
-                logging.info(f' Config > {target["name"]} - {target["enabled"]}')
-        print(f' Encryption          - {"No" if len(passwd)==0 else "Yes"}')
+                print(f" Backup {target['name']:<12} - {'Yes' if target['enabled']==True else 'No'}")
+                logging.info(f"Config > {target['name']} - {target['enabled']}")
+        print(f" Encryption          - {'No' if len(passwd)==0 else 'Yes'}")
         print(Style.RESET_ALL)
     
         if len(passwd) <= 12 and len(passwd)!= 0:
-            print(Fore.YELLOW + f' !! CAUTION - The given password is short. Consider a longer password.' + Style.RESET_ALL)
+            print(Fore.YELLOW + f" !! CAUTION - The given password is short. Consider a longer password." + Style.RESET_ALL)
         if not path_created:
-            print(Fore.YELLOW + ' !! CAUTION - The backup target is an existing directory - The existing contents of the directory may be destroyed if you proceed.' + Style.RESET_ALL)
-        print(' Archives produced are split into 4092Mb volumes (FAT32 limitation).')
+            print(Fore.YELLOW + " !! CAUTION - The backup target is an existing directory - The existing contents of the directory may be destroyed if you proceed." + Style.RESET_ALL)
+        print(" Archives produced are split into 4092Mb volumes (FAT32 limitation).")
         print()      
 
 
-    def cli_run(self, config:dict, out_path:str, passwd:str) -> None:
+    def backup_run(self, config:dict, out_path:str, passwd:str) -> None:
         for key, target in sorted(config.items()):
             if target['enabled']:
                 print(Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL)
@@ -279,26 +281,26 @@ class WinBackup:
         print(Fore.GREEN + " >>> Saving File hashes ... " + Style.RESET_ALL)
         self._save_file_hashes(out_path)
         print(" >> SHA-256 hashes of all archive files saved to sha256.txt")
-        logging.info('SHA-256 hashes of all archive files saved to sha256.txt')
+        logging.info("SHA-256 hashes of all archive files saved to sha256.txt")
 
         if not len(passwd) == 0:
-            with open(os.path.join(out_path, 'Archives_are_encrypted.txt'), 'w') as file:
-                file.write('7z Archives in this folder are encrypted.')
+            with open(os.path.join(out_path, "Archives_are_encrypted.txt"), 'w') as file:
+                file.write("7z Archives in this folder are encrypted.")
 
 
-    def cli_exit(self, out_path, start_time) -> None:
+    def cli_exit(self, out_path:str, start_time:datetime) -> None:
         duration = datetime.now() - start_time
         backup_size = self.archiver._get_path_size(out_path)
         print()
-        logging.debug(f'humanize completion time {humanize.naturaldelta(duration)}')
-        logging.info(f'Backup completed in {duration}')
-        logging.info(f'Total backup size {backup_size} ({humanize.naturalsize(backup_size, True)})')
+        logging.debug(f"humanize completion time {humanize.naturaldelta(duration)}")
+        logging.info(f"Backup completed in {duration}")
+        logging.info(f"Total backup size {backup_size} ({humanize.naturalsize(backup_size, True)})")
         print(Fore.WHITE + f" Completed in {humanize.naturaldelta(duration)}" + Style.RESET_ALL)
         print(Fore.WHITE + f" Total backup size {humanize.naturalsize(backup_size, True)}")
         print(Fore.GREEN + f" Backups done! " + Style.RESET_ALL)
 
 
-    def _start_logger(self, log_level, output_path):
+    def _start_logger(self, log_level:int, output_path:str) -> None:
         if log_level == logging.DEBUG:
             log_format = '%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s'
         else:
@@ -311,7 +313,7 @@ class WinBackup:
                 level=log_level)
 
 
-    def cli(self, output_root_dir,log_level=logging.INFO):
+    def cli(self, output_root_dir:str, log_level:int=logging.INFO) -> None:
         output_path, output_folder_name, path_created = self._create_output_directory(output_root_dir)
         start_time = datetime.now()
         self.output_root_dir = output_root_dir
@@ -323,29 +325,20 @@ class WinBackup:
         self.passwd = self.cli_get_password()
        
         if self._recursive_loop_check(output_path, self.config):
-            print(Fore.RED + ' XX - Output path is a child of a path that will be backed up. This will case an infinite loop. Choose a different path.' + Style.RESET_ALL)
-            logging.critical('Output path is a child of path that will be backed up. This will case an infinite loop. Choose a different path.')
-            print(' Aborted. Exiting.')
+            print(Fore.RED + " XX - Output path is a child of a path that will be backed up. This will case an infinite loop. Choose a different path." + Style.RESET_ALL)
+            logging.critical("Output path is a child of path that will be backed up. This will case an infinite loop. Choose a different path.")
+            print(" Aborted. Exiting.")
             sys.exit(0)
        
         self.cli_summary(self.config, self.passwd, path_created)
        
-        if not self._yes_no_prompt('Do you want to continue?'):
-            print('Aborted. Exiting.')
+        if not self._yes_no_prompt("Do you want to continue?"):
+            logging.info("Backup cancelled after summary. Exiting.") 
+            print(" Aborted. Exiting.")
             sys.exit(0)
        
         print('-' * 40)
         print()
 
-        self.cli_run(self.config, self.output_path, self.passwd)
+        self.backup_run(self.config, self.output_path, self.passwd)
         self.cli_exit(output_path, start_time)
-
-
-
-if __name__ == '__main__':
-    win_backup = WinBackup()
-    if not os.path.exists(os.path.join('..', 'tmp')):
-        os.mkdir(os.path.join('..', 'tmp'))
-    win_backup.cli('tmp')
-    # win_backup.cli_config(win_backup.config)
-   
