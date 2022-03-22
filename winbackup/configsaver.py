@@ -221,8 +221,8 @@ class ConfigSaver:
                 print(' > Battery report saved.')
                 logging.info('Battery report Saved.')
             else:
-                print(Fore.RED + ' XX unable to save battery report (Is this a battery powered device?)' + Style.RESET_ALL)
-                logging.warning('Unable to save battery report (Is this a battery powered device?)')
+                print(Fore.RED + " XX unable to save battery report (Is this a battery powered device?)" + Style.RESET_ALL)
+                logging.warning("Unable to save battery report (Is this a battery powered device?)")
         except Exception as e:
             print(Fore.RED + ' XX unable to backup battery report.' + Style.RESET_ALL)
             logging.warning(f'Unable to save battery report. Exception: {e}')        
