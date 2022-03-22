@@ -63,8 +63,8 @@ def check_first_argument_is_path() -> str:
 def cli():
     # cli_args = get_commandline_arguments()
     output_path = check_first_argument_is_path()
-    win_backup = winbackup.WinBackup()    
-    win_backup.cli(output_path, LOG_LEVEL)
+    win_backup = winbackup.WinBackup(output_path, LOG_LEVEL)    
+    win_backup.cli()
     
 
 if __name__ == '__main__':

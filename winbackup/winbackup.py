@@ -36,15 +36,20 @@ init(autoreset=False)
 
 
 class WinBackup:
-    def __init__(self):
+    def __init__(self, output_root_dir:str, log_level:int=logging.INFO) -> None:
         """
         Backup windows files to 7z archives
         """
         self.archiver = zip7archiver.Zip7Archiver()
         self.config_saver = configsaver.ConfigSaver()
         self.windows_paths = windowspaths.WindowsPaths()
+        self.output_root_dir = output_root_dir
+        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(output_root_dir)
+       
+        self._start_logger(log_level, self.output_path)   
+       
         self.paths = self.windows_paths.get_paths()
-        self.output_path = ''
+        self.start_time = datetime.now()
         self.passwd = ''
 
         # Each backup target is a dictionary, use the config list to interate over
@@ -92,6 +97,22 @@ class WinBackup:
             return True
         else:
             return False
+
+
+    def _start_logger(self, log_level, output_path:str):
+        if log_level == logging.DEBUG:
+            log_format = '%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s'
+        else:
+            log_format = '%(asctime)s - %(levelname)s -> %(message)s'
+
+        logging.basicConfig(filename=os.path.join(output_path, 'winbackup.log'), 
+                encoding='utf-8',
+                filemode='w', 
+                format=log_format,
+                level=log_level)
+        
+        logging.info("WINDOWS BACKUP - v" + __version__)
+        logging.info(f"Output Folder: {output_path}") 
 
 
     @staticmethod
@@ -184,9 +205,6 @@ class WinBackup:
 
 
     def print_cli_header(self, output_path:str, output_folder_name:str, start_time:datetime) -> None:
-        logging.info("WINDOWS BACKUP - v" + __version__)
-        logging.info(f"Output Folder: {output_path}")
-
         print(Fore.BLACK + Back.WHITE + " WINDOWS BACKUP - v" + __version__ + " " + Style.RESET_ALL)
         print(Fore.GREEN + f" Backup started at     : " + Style.RESET_ALL + f" {start_time.strftime('%Y-%m-%d %H:%M')}")
         print(Fore.GREEN + f" Output filename style : " + Style.RESET_ALL + f" {self._create_filename('example')}")
@@ -317,37 +335,18 @@ class WinBackup:
         print(Fore.GREEN + f" Backups done! " + Style.RESET_ALL)
 
 
-    def _start_logger(self, log_level:int, output_path:str) -> None:
-        if log_level == logging.DEBUG:
-            log_format = '%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s'
-        else:
-            log_format = '%(asctime)s - %(levelname)s -> %(message)s'
-
-        logging.basicConfig(filename=os.path.join(output_path, 'winbackup.log'), 
-                encoding='utf-8',
-                filemode='w', 
-                format=log_format,
-                level=log_level)
-
-
-    def cli(self, output_root_dir:str, log_level:int=logging.INFO) -> None:
-        output_path, output_folder_name, path_created = self._create_output_directory(output_root_dir)
-        start_time = datetime.now()
-        self.output_root_dir = output_root_dir
-        self.output_path = output_path
-        
-        self._start_logger(log_level, output_path)
-        self.print_cli_header(output_path, output_folder_name, start_time)
+    def cli(self) -> None:
+        self.print_cli_header(self.output_path, self.output_folder_name, self.start_time)
         self.config = self.cli_config(self.config)
         self.passwd = self.cli_get_password()
        
-        if self._recursive_loop_check(output_path, self.config):
+        if self._recursive_loop_check(self.output_path, self.config):
             print(Fore.RED + " XX - Output path is a child of a path that will be backed up. This will case an infinite loop. Choose a different path." + Style.RESET_ALL)
             logging.critical("Output path is a child of path that will be backed up. This will case an infinite loop. Choose a different path.")
             print(" Aborted. Exiting.")
             sys.exit(0)
        
-        self.cli_summary(self.config, self.passwd, path_created)
+        self.cli_summary(self.config, self.passwd, self.path_created)
        
         if not self._yes_no_prompt("Do you want to continue?"):
             logging.info("Backup cancelled after summary. Exiting.") 
@@ -358,4 +357,4 @@ class WinBackup:
         print()
 
         self.backup_run(self.config, self.output_path, self.passwd, False)
-        self.cli_exit(output_path, start_time)
+        self.cli_exit(self.output_path, self.start_time)
