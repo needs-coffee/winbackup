@@ -49,7 +49,10 @@ def get_commandline_arguments() -> dict:
 def cli():
     cli_args = get_commandline_arguments()
     win_backup = winbackup.WinBackup(cli_args)    
-    win_backup.cli()
+    if cli_args['create_configfile']:
+        win_backup.generate_configfile()
+    else:
+        win_backup.cli()
     
 
 if __name__ == '__main__':

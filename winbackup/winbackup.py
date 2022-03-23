@@ -36,7 +36,7 @@ from . import zip7archiver
 from . import windowspaths
 from . import __version__
 
-DEFAULT_LOG_LEVEL = logging.INFO
+DEFAULT_LOG_LEVEL = logging.DEBUG
 
 init(autoreset=False)
 
@@ -50,7 +50,7 @@ class WinBackup:
         self.config_saver = configsaver.ConfigSaver()
         self.windows_paths = windowspaths.WindowsPaths()
     
-        self.output_root_dir = self.get_path_argument(args)
+        self.output_root_dir = self.get_output_path_argument(args)
         self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.output_root_dir)
         
         if args['verbose']:
@@ -81,8 +81,8 @@ class WinBackup:
         '11_desktop': {'name': 'Desktop', 'type': 'folder', 'path': self.paths['desktop'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '12_pictures': {'name': 'Pictures', 'type': 'folder', 'path': self.paths['pictures'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},
         '13_downloads': {'name': 'Downloads', 'type': 'folder', 'path': self.paths['downloads'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '14_videos': {'name': 'Videos', 'type': 'folder', 'path': self.paths['videos'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},
-        '15_music': {'name': 'Music', 'type': 'folder', 'path': self.paths['music'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},
+        '14_videos': {'name': 'Videos', 'type': 'folder', 'path': self.paths['videos'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
+        '15_music': {'name': 'Music', 'type': 'folder', 'path': self.paths['music'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
         '16_savedgames': {'name': 'Saved Games', 'type': 'folder', 'path': self.paths['saved_games'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '30_plexserver': {'name': 'Plex Server', 'type': 'special', 'path': os.path.join(self.paths['local_appdata'], 'Plex Media Server'), 'enabled': False, 'hidden': not self._plex_possible(self.paths), 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '31_virtualboxvms': {'name': 'VirtualBox VMs', 'type': 'folder', 'path': os.path.join(os.path.expanduser('~'), 'VirtualBox VMs'), 'enabled': False, 'hidden': not self._virtualbox_possible(self.paths), 'dict_size': '128m', 'mx_level': 9, 'full_path': False},
@@ -112,21 +112,34 @@ class WinBackup:
         sys.exit(1)        
 
 
-    def get_path_argument(self, args:dict) -> str:
+    def get_output_path_argument(self, args:dict) -> str:
         """
         check the first argument is a real path, if not exit
         if is a path - return path
         """
         path = args['path']
         if not path:
-            print(Fore.RED + ' ERROR - First argument must be the output folder path' + Style.RESET_ALL)
+            print(Fore.RED + " ERROR - First argument must be the output folder path" + Style.RESET_ALL)
             sys.exit(1)
         else:
             if os.path.isdir(path):
                 return os.path.abspath(path)
             else:
-                print(Fore.RED + 'ERROR - first argument is not a valid folder' + Style.RESET_ALL)
+                print(Fore.RED + "ERROR - first argument is not a valid folder" + Style.RESET_ALL)
                 sys.exit(1)
+
+
+    def generate_configfile(self, path=None):
+        if not path:
+            path = self.output_path
+        print(f"Default config winbackup_config.json saved to {path}")
+        with open(os.path.join(path, 'winbackup_config.json'), 'w') as fout:
+            json.dump(self.config, fout)
+
+
+    def load_configfile(self, configfile_path:str) -> dict:
+        #Load a config file from disk into self.config
+        pass
 
 
     def _start_logger(self, log_level, output_path:str):
