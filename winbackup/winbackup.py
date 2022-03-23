@@ -15,7 +15,9 @@
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
 import os
+from select import select
 import sys
+import json
 import signal
 import logging
 import ctypes
@@ -34,22 +36,32 @@ from . import zip7archiver
 from . import windowspaths
 from . import __version__
 
+DEFAULT_LOG_LEVEL = logging.INFO
+
 init(autoreset=False)
 
 
 class WinBackup:
-    def __init__(self, output_root_dir:str, log_level:int=logging.INFO) -> None:
+    def __init__(self, args:dict) -> None:
         """
         Backup windows files to 7z archives
         """
         self.archiver = zip7archiver.Zip7Archiver()
         self.config_saver = configsaver.ConfigSaver()
         self.windows_paths = windowspaths.WindowsPaths()
-        self.output_root_dir = output_root_dir
-        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(output_root_dir)
-       
+    
+        self.output_root_dir = self.get_path_argument(args)
+        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.output_root_dir)
+        
+        if args['verbose']:
+            log_level = logging.DEBUG
+        else:
+            log_level = DEFAULT_LOG_LEVEL
         self._start_logger(log_level, self.output_path)   
        
+        self.args = args
+        logging.debug(f"CLI Args: {args}")
+
         self.paths = self.windows_paths.get_paths()
         self.start_time = datetime.now()
         self.passwd = ''
@@ -98,6 +110,23 @@ class WinBackup:
         print()
         print(Fore.RED + " Ctrl-C received - Exiting." + Style.RESET_ALL)
         sys.exit(1)        
+
+
+    def get_path_argument(self, args:dict) -> str:
+        """
+        check the first argument is a real path, if not exit
+        if is a path - return path
+        """
+        path = args['path']
+        if not path:
+            print(Fore.RED + ' ERROR - First argument must be the output folder path' + Style.RESET_ALL)
+            sys.exit(1)
+        else:
+            if os.path.isdir(path):
+                return os.path.abspath(path)
+            else:
+                print(Fore.RED + 'ERROR - first argument is not a valid folder' + Style.RESET_ALL)
+                sys.exit(1)
 
 
     def _start_logger(self, log_level, output_path:str):

@@ -15,55 +15,40 @@
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
 import sys
-import os
-import logging
 from argparse import ArgumentParser, RawTextHelpFormatter
-from colorama import Fore, Back, Style, init
-from . import __version__
+from . import __version__, __license__, __copyright__
 from . import winbackup
 
-LOG_LEVEL = logging.DEBUG
 
 def get_commandline_arguments() -> dict:
     """
     Parse command line arguments.
     """
     helpstring = """
-    windows_backup version {}
     Backupscript for windows.
-    For backing up onenote - onenote for office and word need to be installed.
-    """.format(__version__)
+    Backs up user folders to 7z archives.
+    Can also back up Plex Media Server, Hyper-V VMs and VirtualBox VMs
+    
+    winbackup version {}
+    This program comes with ABSOLUTELY NO WARRANTY. 
+    This is free software, and you are welcome to redistribute it 
+    under certain conditions, see the GPLv3 Licence file attached.
+    {} - Licence: {} """.format(__version__, __copyright__, __license__)
 
     parser = ArgumentParser(description=helpstring, formatter_class=RawTextHelpFormatter)
-    parser.add_argument("path", type=str, help="The Path that should contain the output")
-    parser.add_argument('-a', '--all', help="Backup all options selectable.", nargs="?", const=".", metavar='PATH')
-    parser.add_argument('-v', '--verbose', help="enable verbose logging")
+    parser.add_argument("path", type=str, help="The Path that should contain the output", nargs="?")
+    parser.add_argument('-a', '--all', help="Backup all options selectable.", action="store_true")
+    parser.add_argument('-c', '--configfile', help="supply a configfile.", nargs=1)
+    parser.add_argument('-C', '--create-configfile', help="Generate default configfile.", action="store_true")
+    parser.add_argument('-v', '--verbose', help="Enable verbose logging.", action="store_true") #?store_const
     parser.add_argument('-V', '--version', action='version', version=__version__)
-    args = parser.parse_args()
+    args = vars(parser.parse_args())
     return args
 
 
-def check_first_argument_is_path() -> str:
-    """
-    check the first argument is a real path, if not exit
-    if is a path - return path
-    """
-    if len(sys.argv) == 1:
-        print(Fore.RED + 'ERROR - First argument must be the output folder path' + Style.RESET_ALL)
-        sys.exit(1)
-    else:
-        if os.path.isdir(sys.argv[1]):
-           return os.path.abspath(sys.argv[1])
-
-        else:
-            print(Fore.RED + 'ERROR - first argument is not a valid folder' + Style.RESET_ALL)
-            sys.exit(1)
-
-
 def cli():
-    # cli_args = get_commandline_arguments()
-    output_path = check_first_argument_is_path()
-    win_backup = winbackup.WinBackup(output_path, LOG_LEVEL)    
+    cli_args = get_commandline_arguments()
+    win_backup = winbackup.WinBackup(cli_args)    
     win_backup.cli()
     
 
