@@ -23,6 +23,7 @@ from tqdm import tqdm
 from colorama import Fore, Style
 from send2trash import send2trash
 from typing import Union
+import humanize
 
 
 class Zip7Archiver:
@@ -143,11 +144,11 @@ class Zip7Archiver:
                             if "Add new data to archive: " in line:
                                 before_size_line = line.split('Add new data to archive: ')[1].strip()
                                 tqdm.write(Fore.CYAN + f" >> Data to compress: {before_size_line}" + Style.RESET_ALL)
-                                logging.info(f"{filename} Data to compress: {before_size_line}")
+                                logging.debug(f"{filename} Data to compress: {before_size_line}")
                             if "Archive size: " in line:
                                 after_size_line = line.split('Archive size: ')[1].strip()
                                 tqdm.write(Fore.CYAN + f" >> Compressed Size : {after_size_line}" + Style.RESET_ALL)
-                                logging.info(f"{filename} Compressed Size: {after_size_line}")
+                                logging.debug(f"{filename} Compressed Size: {after_size_line}")
                             if "%" in line:
                                 pbar.update(int(line.split('%')[0].strip()) - pbar.n)
                 else:
@@ -163,6 +164,10 @@ class Zip7Archiver:
 
         before_size_bytes = int(before_size_line.split('bytes')[0].split()[-1].strip()) 
         after_size_bytes = int(after_size_line.split('bytes')[0].split()[-1].strip())
+        logging.debug(f"Backup size in bytes. Before: {before_size_bytes} after: {after_size_bytes}")
+        logging.info(f"Backup {filename} complete. Size: {humanize.naturalsize(before_size_bytes, True)}" +
+                        " >> {humanize.naturalsize(after_size_bytes, True)}" + 
+                        " (Compressed to {(after_size_bytes/before_size_bytes)*100:0.1f}% of input size)")
 
         return before_size_bytes, after_size_bytes
 
