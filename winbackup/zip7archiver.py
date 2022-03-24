@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
-from multiprocessing.sharedctypes import Value
 import sys
 import os
 import subprocess
@@ -131,14 +130,16 @@ class Zip7Archiver:
         else:
             raise ValueError
 
+        before_size_line = ''
+        after_size_line = ''
         # run the backup task with a tqdm progress bar.
         try:
             with subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                                    shell=False, bufsize=1, universal_newlines=True) as p:
+                                shell=False, bufsize=1, universal_newlines=True, errors='ignore') as p:
                 if not quiet:
                     with tqdm(total=100, colour='Cyan', leave=False, desc=f' Compressing ', unit='%') as pbar:
                         logging.debug("progress bar started")
-                        for line in p.stdout:
+                        for line in p.stdout: #cp1252 decoded string, ignore invalid chars like 0x81
                             if len(line.strip()) != 0:
                                 logging.debug("backup_folder line output: " + line.strip())
                             if "Add new data to archive: " in line:
@@ -157,7 +158,7 @@ class Zip7Archiver:
                             logging.debug("Backup line output: " + line.strip())
                         
         except Exception as e:
-            logging.debug(f"Backup failed - File: {filename} Exception: {e}")
+            logging.debug(f"Exception: {e}", exc_info=True, stack_info=True)
             if not quiet:
                 print(Fore.RED + f" XX - Failed to backup {filename}. Set log level to debug for info." + Style.RESET_ALL)
             logging.error(f'Failed to backup {filename}. Set log level to debug for info.')
@@ -166,14 +167,14 @@ class Zip7Archiver:
         after_size_bytes = int(after_size_line.split('bytes')[0].split()[-1].strip())
         logging.debug(f"Backup size in bytes. Before: {before_size_bytes} after: {after_size_bytes}")
         logging.info(f"Backup {filename} complete. Size: {humanize.naturalsize(before_size_bytes, True)}" +
-                        " >> {humanize.naturalsize(after_size_bytes, True)}" + 
-                        " (Compressed to {(after_size_bytes/before_size_bytes)*100:0.1f}% of input size)")
+                        f" >> {humanize.naturalsize(after_size_bytes, True)}" + 
+                        f" (Compressed to {(after_size_bytes/before_size_bytes)*100:0.1f}% of input size)")
 
         return before_size_bytes, after_size_bytes
 
 
     def backup_plex_folder(self, filename:str, in_folder_path:str, out_folder:str, 
-                            password:str='', dict_size:str='128m', mx_level:int=5, quiet:bool=False) -> tuple[int, int]:
+                        password:str='', dict_size:str='128m', mx_level:int=5, quiet:bool=False) -> tuple[int, int]:
         # From testing - backing up plex database mx9 md128m takes 10gb of ram, mx9 md192m fails memory allocation on 16gb pc.
         #plex server files should be tarballed before compression as compressing disk files causes issues when restoring.
         tar_filename = filename[:-3] + '.tar'
@@ -183,7 +184,7 @@ class Zip7Archiver:
                     os.path.join(out_folder, tar_filename), in_folder_path]
         
         with subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False,
-                            bufsize=1, universal_newlines=True) as p:
+                            bufsize=1, universal_newlines=True, errors='ignore') as p:
             if not quiet:
                 with tqdm(total=100, colour='Cyan', leave=False, desc=f' Tarballing PMS ', unit='%') as pbar:
                     for line in p.stdout:
