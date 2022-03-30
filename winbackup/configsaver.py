@@ -86,7 +86,7 @@ class ConfigSaver:
         with open(os.path.join(out_path,'winfetch_output.txt'), 'w') as out_file:
             out_file.write(winfetch_output)
         print(' > Winfetch saved.')
-        logging.info('Winfetch Saved.')
+        logging.info('Winfetch Saved.') 
 
 
     def save_installed_programs(self, out_path:str) -> None:

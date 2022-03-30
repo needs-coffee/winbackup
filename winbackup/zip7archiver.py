@@ -154,6 +154,10 @@ class Zip7Archiver:
                                 pbar.update(int(line.split('%')[0].strip()) - pbar.n)
                 else:
                     for line in p.stdout:
+                        if "Add new data to archive: " in line:
+                            before_size_line = line.split('Add new data to archive: ')[1].strip()
+                        if "Archive size: " in line:
+                            after_size_line = line.split('Archive size: ')[1].strip()
                         if len(line.strip()) != 0:
                             logging.debug("Backup line output: " + line.strip())
                         
@@ -206,7 +210,7 @@ class Zip7Archiver:
         # compress the tar
         before_size, after_size = self.backup_folder(filename, os.path.join(out_folder, tar_filename), out_folder, 
                                                 password, dict_size=dict_size, mx_level=mx_level, full_path=False, 
-                                                split=True, split_force=True)
+                                                split=True, split_force=True, quiet=quiet)
 
         # delete the tar file
         send2trash(os.path.join(out_folder,tar_filename))
