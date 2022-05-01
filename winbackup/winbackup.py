@@ -15,9 +15,7 @@
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
 import os
-from select import select
 import sys
-import json
 import signal
 import logging
 import ctypes
@@ -25,7 +23,6 @@ import getpass
 import hashlib
 import subprocess
 from datetime import datetime
-from tkinter import Listbox
 from send2trash import send2trash
 from colorama import Fore, Back, Style, init
 from pathlib import Path
@@ -34,6 +31,7 @@ import humanize
 from . import configsaver
 from . import zip7archiver
 from . import windowspaths
+from . import configagent
 from . import __version__
 
 DEFAULT_LOG_LEVEL = logging.DEBUG
@@ -49,56 +47,81 @@ class WinBackup:
         self.archiver = zip7archiver.Zip7Archiver()
         self.config_saver = configsaver.ConfigSaver()
         self.windows_paths = windowspaths.WindowsPaths()
-    
-        self.output_root_dir = self.get_output_path_argument(args)
-        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.output_root_dir)
-        
+        self.config_agent = configagent.ConfigAgent()
+        self.args = args
+
+        self.config_agent.output_root_dir = self.get_output_path_argument(args)
+        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.config_agent.output_root_dir)
+
         if args['verbose']:
             log_level = logging.DEBUG
         else:
             log_level = DEFAULT_LOG_LEVEL
         self._start_logger(log_level, self.output_path)   
        
-        self.args = args
+        logging.debug(f'Output Root Dir: {self.config_agent.output_root_dir}')
+        logging.debug(f'Output path: {self.output_path}')
+        logging.debug(f'Output folder name: {self.output_folder_name}')
+        logging.debug(f'path created? {self.path_created}')
         logging.debug(f"CLI Args: {args}")
 
         self.paths = self.windows_paths.get_paths()
+        self.config_agent.update_config_paths(self.paths)
+        self.config_agent.encryption_password = ''
         self.start_time = datetime.now()
-        self.passwd = ''
         self.hyperv_paths_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scripts', 'hyperv_paths.ps1')
 
-        # Each backup target is a dictionary, use the config list to interate over
-        # name - target name, will also be used to derive the output folder name
-        # type - special = specific backup function, folder = single folder target
-        # path - backup target path
-        # enabled - if the target will be backed up, default false for all
-        # hidden - if a specific target is impossible, set as hidden and don't show in config
-        # dict_size and mx_level - 7z dictionary size and compression level
-        # full path - store the full path to the compressed files
-        self.config = {
-        '01_config': {'name': 'Config', 'type': 'special', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '10_documents': {'name': 'Documents', 'type': 'folder', 'path': self.paths['documents'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '11_desktop': {'name': 'Desktop', 'type': 'folder', 'path': self.paths['desktop'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '12_pictures': {'name': 'Pictures', 'type': 'folder', 'path': self.paths['pictures'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},
-        '13_downloads': {'name': 'Downloads', 'type': 'folder', 'path': self.paths['downloads'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '14_videos': {'name': 'Videos', 'type': 'folder', 'path': self.paths['videos'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
-        '15_music': {'name': 'Music', 'type': 'folder', 'path': self.paths['music'], 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
-        '16_savedgames': {'name': 'Saved Games', 'type': 'folder', 'path': self.paths['saved_games'], 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '30_plexserver': {'name': 'Plex Server', 'type': 'special', 'path': os.path.join(self.paths['local_appdata'], 'Plex Media Server'), 'enabled': False, 'hidden': not self._plex_possible(self.paths), 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '31_virtualboxvms': {'name': 'VirtualBox VMs', 'type': 'folder', 'path': os.path.join(os.path.expanduser('~'), 'VirtualBox VMs'), 'enabled': False, 'hidden': not self._virtualbox_possible(self.paths), 'dict_size': '128m', 'mx_level': 9, 'full_path': False},
-        '32_hypervvms': {'name': 'HyperV VMs', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': True, 'dict_size': '128m', 'mx_level': 9, 'full_path': True},
-        '33_onenote': {'name': 'Onenote', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': not self._onenote_possible(), 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        self.config_saver.set_videos_directory_path(self.config_agent._target_config['14_videos']['path'])
+
+        ## ** Plex Specific setup
+        plex_config_item = {
+            'name': 'Plex Server', 
+            'type': 'special', 
+            'path': os.path.join(self.paths['local_appdata'], 'Plex Media Server'), 
+            'enabled': False, 
+            'hidden': False, 
+            'dict_size': '192m', 
+            'mx_level': 9, 
+            'full_path': False
         }
+        if os.path.exists(os.path.join(self.paths['local_appdata'], 'Plex Media Server')):
+            logging.debug('Plex item added to config')
+            self.config_agent.add_item('30_plexserver', plex_config_item)
 
-        self.config_saver.set_videos_directory_path(self.config['14_videos']['path'])
+        ## ** virtualbox specific setup
+        virtualbox_config_item = {
+            'name': 'VirtualBox VMs', 
+            'type': 'folder', 
+            'path': os.path.join(os.path.expanduser('~'), 'VirtualBox VMs'), 
+            'enabled': False, 
+            'hidden': False, 
+            'dict_size': '128m', 
+            'mx_level': 9, 
+            'full_path': False
+        }
+        if os.path.exists(os.path.join(os.path.expanduser('~'), 'VirtualBox VMs')):
+            logging.debug('VirtualboxVMs item added to config')
+            self.config_agent.add_item('31_virtualboxvms', virtualbox_config_item)
 
+        ## ** HyperV specific setup
+        hyperv_config_item = {
+            'name': 'HyperV VMs', 
+            'type': 'folder', 
+            'path': None, 
+            'enabled': False, 
+            'hidden': False, 
+            'dict_size': '128m', 
+            'mx_level': 9, 
+            'full_path': True
+        }
         if self.check_if_admin() and self._hyperv_possible():
-            logging.debug('HyperV is possible.')
-            self.config['32_hypervvms']['path'] = self._get_hyperv_paths()
-            self.config['32_hypervvms']['hidden'] = False
+            logging.debug('HyperV item added to config')
+            hyperv_config_item['path'] = self._get_hyperv_paths()
+            self.config_agent.add_item('32_hypervvms')
  
-        signal.signal(signal.SIGINT, self._ctrl_c_handler)
-
+        ## ** onenote specific setup
+        ## 33_onenote
+        ## default compression settings, to be implemented 
 
     @staticmethod
     def _command_runner(shell_commands:list) -> str:
@@ -132,21 +155,15 @@ class WinBackup:
     def generate_configfile(self, path=None):
         if not path:
             path = self.output_path
-        print(f"Default config winbackup_config.json saved to {path}")
-        with open(os.path.join(path, 'winbackup_config.json'), 'w') as fout:
-            json.dump(self.config, fout)
-
-
-    def load_configfile(self, configfile_path:str) -> dict:
-        #Load a config file from disk into self.config
-        pass
+        save_path = self.config_agent.save_YAML_config(os.path.join(path, 'winbackup_config.yaml'))
+        print(f"Default config winbackup_config.yaml saved to {save_path}")
 
 
     def _start_logger(self, log_level, output_path:str):
         if log_level == logging.DEBUG:
-            log_format = '%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s'
+            log_format = "%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s"
         else:
-            log_format = '%(asctime)s - %(levelname)s -> %(message)s'
+            log_format = "%(asctime)s - %(levelname)s -> %(message)s"
 
         logging.basicConfig(filename=os.path.join(output_path, 'winbackup.log'), 
                 encoding='utf-8',
@@ -156,20 +173,6 @@ class WinBackup:
         
         logging.info("WINDOWS BACKUP - v" + __version__)
         logging.info(f"Output Folder: {output_path}") 
-
-
-    def _plex_possible(self, paths:list) -> bool:
-        if os.path.exists(os.path.join(paths['local_appdata'], 'Plex Media Server')):
-            return True
-        else:
-            return False
-
-
-    def _virtualbox_possible(self, paths:list) -> bool:
-        if os.path.exists(os.path.join(os.path.expanduser('~'), 'VirtualBox VMs')):
-            return True
-        else:
-            return False
 
 
     def _hyperv_possible(self) -> bool:
@@ -301,7 +304,7 @@ class WinBackup:
         return False
 
 
-    def print_cli_header(self, output_path:str, output_folder_name:str, start_time:datetime) -> None:
+    def cli_header(self, output_path:str, output_folder_name:str, start_time:datetime) -> None:
         print(Fore.BLACK + Back.WHITE + " WINDOWS BACKUP - v" + __version__ + " " + Style.RESET_ALL)
         print(Fore.GREEN + f" Backup started at     : " + Style.RESET_ALL + f" {start_time.strftime('%Y-%m-%d %H:%M')}")
         print(Fore.GREEN + f" Output filename style : " + Style.RESET_ALL + f" {self._create_filename('example')}")
@@ -344,7 +347,7 @@ class WinBackup:
         return passwd
     
 
-    def cli_summary(self, config:dict, passwd:str, path_created:bool) -> None:
+    def cli_config_summary(self, config:dict, passwd:str, path_created:bool) -> None:
         print(Fore.BLACK + Back.WHITE + " ** CONFIG SUMMARY ** " + Style.RESET_ALL + Fore.GREEN)
         for key, target in sorted(config.items()):
             if not target['hidden']:
@@ -357,12 +360,14 @@ class WinBackup:
             print(Fore.YELLOW + f" !! CAUTION - The given password is short. Consider a longer password." + Style.RESET_ALL)
         if not path_created:
             print(Fore.YELLOW + " !! CAUTION - Output directory already exists - Contents may be destroyed if you proceed." + Style.RESET_ALL)
-        if config['30_plexserver']['enabled'] and self._plex_server_running():
-            print(Fore.YELLOW + " !! CAUTION - Plex Media Server is running - Recommend stopping Plex Server before backing up." + Style.RESET_ALL)
-        if config['32_hypervvms']['enabled']:
-            print(Fore.YELLOW + " !! CAUTION - HyperV has been enabled - Please check VMs are stopped before running." + Style.RESET_ALL)
-        if self._hyperv_possible() and not self.check_if_admin():
-            print(Fore.CYAN + " -- INFO - HyperV detected on system. To backup HyperV run winbackup as admin." + Style.RESET_ALL)
+        if '30_plexserver' in config:
+            if config['30_plexserver']['enabled'] and self._plex_server_running():
+                print(Fore.YELLOW + " !! CAUTION - Plex Media Server is running - Recommend stopping Plex Server before backing up." + Style.RESET_ALL)
+        if '32_hypervvms' in config:
+            if config['32_hypervvms']['enabled']:
+                print(Fore.YELLOW + " !! CAUTION - HyperV has been enabled - Please check VMs are stopped before running." + Style.RESET_ALL)
+            if self._hyperv_possible() and not self.check_if_admin():
+                print(Fore.CYAN + " -- INFO - HyperV detected on system. To backup HyperV run winbackup as admin." + Style.RESET_ALL)
 
         print(Fore.CYAN + " -- INFO - Archives produced are split into 4092Mb volumes (FAT32 limitation)." + Style.RESET_ALL)
         print()      
@@ -407,10 +412,10 @@ class WinBackup:
                         except Exception as e:
                             logging.error(f"backup {filename} failed. Exception: {e}")
                             print(Fore.RED + f" XX - Backup {filename} failed. See logs."  + Style.RESET_ALL)                                                        
-                    elif key == '32_hypervvms':
-                        pass
-                    elif key == '33_onenote':
-                        pass
+                    # elif key == '32_hypervvms':
+                    #     pass
+                    # elif key == '33_onenote':
+                    #     pass
                 if not quiet:
                     print(f" >> {target['name']} saved to 7z - {filename}")
                 logging.debug(f"Backup finished for - {target['name']} - filename: {filename}")
@@ -440,17 +445,20 @@ class WinBackup:
 
 
     def cli(self) -> None:
-        self.print_cli_header(self.output_path, self.output_folder_name, self.start_time)
-        self.config = self.cli_config(self.config)
-        self.passwd = self.cli_get_password()
+        signal.signal(signal.SIGINT, self._ctrl_c_handler)
+        self.cli_header(self.output_path, self.output_folder_name, self.start_time)
+        self.config_agent._target_config = self.cli_config(self.config_agent._target_config)
+        self.config_agent.encryption_password = self.cli_get_password()
        
-        if self._recursive_loop_check(self.output_path, self.config):
+        if self._recursive_loop_check(self.output_path, self.config_agent._target_config):
             print(Fore.RED + " XX - Output path is a child of a path that will be backed up. This will case an infinite loop. Choose a different path." + Style.RESET_ALL)
             logging.critical("Output path is a child of path that will be backed up. This will case an infinite loop. Choose a different path.")
             print(" Aborted. Exiting.")
             sys.exit(0)
        
-        self.cli_summary(self.config, self.passwd, self.path_created)
+        self.cli_config_summary(self.config_agent._target_config, 
+                            self.config_agent.encryption_password, 
+                            self.path_created)
        
         if not self._yes_no_prompt("Do you want to continue?"):
             logging.info("Backup cancelled after summary. Exiting.") 
@@ -460,5 +468,8 @@ class WinBackup:
         print('-' * 40)
         print()
 
-        self.backup_run(self.config, self.output_path, self.passwd, False)
+        self.backup_run(self.config_agent._target_config, 
+                        self.output_path, 
+                        self.config_agent.encryption_password, 
+                        False)
         self.cli_exit(self.output_path, self.start_time)
