@@ -41,6 +41,15 @@ class ConfigAgent:
         # enabled - if the target will be backed up, default false for all
         # dict_size and mx_level - 7z dictionary size and compression level (See 7z cli docs for explanation)
         # full path - store the full path to the compressed files. Defaults to relative paths.
+        self._base_config_item = {
+            'name': None,
+            'type': 'folder',
+            'path': None,
+            'enabled': False,
+            'dict_size': '192m',
+            'mx_level': 9,
+            'full_path': False
+        }
 
         self._base_target_config = {
         '01_config': {'name': 'Config', 'type': 'special', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
@@ -54,6 +63,7 @@ class ConfigAgent:
         }
 
         self._base_global_config = {
+            'encryption_enabled': False,
             'encryption_password' : '',
             'output_root_dir': '.',
         }
@@ -102,7 +112,7 @@ class ConfigAgent:
 
     def add_item(self, config_item_id:str, config_item:dict, config:dict=None) -> dict:
         """
-        Add a backup row to the config file
+        Add a backup row to the config file. Missing config items in config_item_id will be added with defaults.
         Parameters:
         - config_item_id : key of the item, acts as an id format 00_name
         - config_item    : dictionary of the config items. 
@@ -118,17 +128,28 @@ class ConfigAgent:
         for key in config_item:
             if key not in {'name', 'type', 'path', 'enabled', 'dict_size', 'mx_level', 'full_path'}:
                 raise ValueError(f"Key {key} in config_item not permitted.")
-    
+
         if not config:
             if not self._target_config:
                 config = self._base_target_config
             else:
                 config = self._target_config
-        
+
+        new_config_item = self._base_config_item.copy()
+        new_config_item.update(config_item)
+        logging.debug(f"config_item argument - {config_item}")
+        logging.debug(f"combined config item - {new_config_item}")
+
+        if config_item['name'] == None:
+            raise ValueError("Name is required for config_item to be added to target_config")
+        if config_item['type'] == 'folder':
+            if config_item['path'] == None:
+                raise ValueError("path is required for config_item with type folder to be added to target_config")
+
         try:
-            config[config_item_id] = config_item
+            config[config_item_id] = new_config_item
         except Exception as e:
-            logging.error(f"Could not add config_item {config_item} to config, exception {e}")
+            logging.error(f"Could not add config_item {config_item_id} to config, exception {e}")
             logging.debug(traceback.format_exc())
             raise
 
@@ -145,8 +166,17 @@ class ConfigAgent:
         if not self._target_config:
             logging.warning("Called before folder paths set. Base target_config used. Paths must be set before attempting backup.")
             self._target_config = self._base_target_config
-
         return self._target_config
+
+
+    def set_target_config(self, new_target_config:dict) -> None:
+        """
+        if the target_config is set - update
+        if not - create from supplied config
+        """
+        config = self._target_config
+        config.update(new_target_config)
+        self._target_config = config
 
 
     def get_global_config(self) -> dict:
@@ -158,6 +188,16 @@ class ConfigAgent:
             self._global_config = self._base_global_config
 
         return self._global_config
+
+
+    def set_global_config(self, new_global_config:dict) -> None:
+        """
+        if the global_config is set - update
+        if not - create from supplied config
+        """
+        config = self._global_config
+        config.update(new_global_config)
+        self._global_config = config
 
 
     def get_output_root_path(self) -> str:
@@ -316,11 +356,11 @@ class ConfigAgent:
                 return False
 
         for key in global_config:
-            valid_keys = {'encryption_password', 'output_root_dir'}
+            valid_keys = {'encryption_password', 'output_root_dir', 'encryption_enabled'}
             required_keys = {'output_root_dir'}
             if key not in valid_keys:
-                logging.warning(f"Unknown Key {key} in config_item for {id}. This will be ignored.")
-                print(f"Unknown Key {key} in config_item for {id}. This will be ignored.")
+                logging.warning(f"Unknown Key {key} in global config. This will be ignored.")
+                print(f"Unknown Key {key} in global config. This will be ignored.")
             if key in required_keys:
                 required_keys.remove(key)
 
@@ -408,23 +448,30 @@ class ConfigAgent:
         with open(path, 'r') as fin:
             config = yaml.safe_load(fin)
         
-        global_config = config['global']
-        target_config = config['backup_targets']
-        if not self.validate_global_config(global_config):
-            raise ValueError(f"Invalid global config loaded from {path}")
-        if not self.validate_target_config(target_config):
-            raise ValueError(f"Invalid target config loaded from {path}")
-    
-        self._global_config = global_config
-        self._target_config = target_config
+        loaded_global_config = config['global']
+        loaded_target_config = config['backup_targets']
 
-        return global_config, target_config 
+        merged_global_config = self._base_global_config.copy()
+        merged_global_config.update(loaded_global_config)
+        if len(merged_global_config['encryption_password']) != 0:
+            logging.debug(f'Encryption password from configfile is not empty, enable encryption')
+            merged_global_config['encryption_enabled'] = True
+        if not self.validate_global_config(loaded_global_config):
+            raise ValueError(f"Invalid global config loaded from {path}")
+        if not self.validate_target_config(loaded_target_config):
+            raise ValueError(f"Invalid target config loaded from {path}")
+
+
+        self._global_config = merged_global_config
+        self._target_config = loaded_target_config
+
+        return merged_global_config, loaded_target_config 
 
 
     encryption_password = property(get_encryption_password, set_encryption_password)
     output_root_dir = property(get_output_root_path, set_output_root_path)
-    target_config = property(get_target_config)
-    global_config = property(get_global_config)
+    target_config = property(get_target_config, set_target_config)
+    global_config = property(get_global_config, set_global_config)
 
 
 if __name__ == "__main__":

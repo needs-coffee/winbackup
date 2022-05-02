@@ -22,6 +22,7 @@ import ctypes
 import getpass
 import hashlib
 import subprocess
+import traceback
 from datetime import datetime
 from send2trash import send2trash
 from colorama import Fore, Back, Style, init
@@ -78,10 +79,6 @@ class WinBackup:
             'name': 'Plex Server', 
             'type': 'special', 
             'path': os.path.join(self.paths['local_appdata'], 'Plex Media Server'), 
-            'enabled': False, 
-            'dict_size': '192m', 
-            'mx_level': 9, 
-            'full_path': False
         }
         if os.path.exists(os.path.join(self.paths['local_appdata'], 'Plex Media Server')):
             logging.debug('Plex item added to config')
@@ -90,12 +87,8 @@ class WinBackup:
         ## ** virtualbox specific setup
         virtualbox_config_item = {
             'name': 'VirtualBox VMs', 
-            'type': 'folder', 
             'path': os.path.join(os.path.expanduser('~'), 'VirtualBox VMs'), 
-            'enabled': False, 
             'dict_size': '128m', 
-            'mx_level': 9, 
-            'full_path': False
         }
         if os.path.exists(os.path.join(os.path.expanduser('~'), 'VirtualBox VMs')):
             logging.debug('VirtualboxVMs item added to config')
@@ -106,15 +99,13 @@ class WinBackup:
             'name': 'HyperV VMs', 
             'type': 'folder', 
             'path': None, 
-            'enabled': False, 
             'dict_size': '128m', 
-            'mx_level': 9, 
             'full_path': True
         }
         if self.check_if_admin() and self._hyperv_possible():
             logging.debug('HyperV item added to config')
             hyperv_config_item['path'] = self._get_hyperv_paths()
-            self.config_agent.add_item('32_hypervvms')
+            self.config_agent.add_item('32_hypervvms', hyperv_config_item)
  
         ## ** onenote specific setup
         ## 33_onenote
@@ -147,13 +138,6 @@ class WinBackup:
             else:
                 print(Fore.RED + "ERROR - first argument is not a valid folder" + Style.RESET_ALL)
                 sys.exit(1)
-
-
-    def generate_configfile(self, path=None):
-        if not path:
-            path = self.output_path
-        save_path = self.config_agent.save_YAML_config(os.path.join(path, 'winbackup_config.yaml'))
-        print(f"Default config winbackup_config.yaml saved to {save_path}")
 
 
     def _start_logger(self, log_level, output_path:str):
@@ -324,7 +308,7 @@ class WinBackup:
     def cli_get_password(self) -> str:
         passwd = ''
         while(1):
-            print(Fore.GREEN + f" > Password for encryption : " + Style.RESET_ALL, end='')
+            print(Fore.GREEN + f" > Password for encryption (leave blank to disable) : " + Style.RESET_ALL, end='')
             passwd = getpass.getpass(prompt='')
             if len(passwd) == 0:
                 print(" No password provided. 7z files produced will not be encrypted.")
@@ -439,11 +423,75 @@ class WinBackup:
         print(Fore.GREEN + f" Backups done! " + Style.RESET_ALL)
 
 
-    def cli(self) -> None:
+    def generate_blank_configfile(self, path=None):
+        if not path:
+            path = os.getcwd()
+        config_file_path = os.path.join(path, 'winbackup_config.yaml')
+        if self._yes_no_prompt(f"Save default configuration to {config_file_path}?"):
+            save_path = self.config_agent.save_YAML_config(config_file_path)
+            print(f"Default config winbackup_config.yaml saved to {save_path}")
+
+
+    def interactive_config_builder(self, target_path:str) -> None:
+        """
+        Build a custom config from the interactive script but save as config file to path
+        """
+        print(Fore.BLACK + Back.WHITE + " WINDOWS BACKUP - v" + __version__ + " " + Style.RESET_ALL)
+        print(Fore.GREEN + f" Interactive configuration builder" + Style.RESET_ALL)
+        print(Fore.GREEN + f" Generated configuration file will be saved to:" + Style.RESET_ALL + f"{target_path}")
+        print()
+        
+        self.config_agent.target_config = self.cli_config(self.config_agent.target_config)
+        password = self.cli_get_password()
+        if not len(password) == 0:
+            self.config_agent.encryption_password = password
+            self.config_agent.global_config['encryption_enabled'] = True
+        try:
+            if os.path.isdir(target_path):
+                target_path = os.path.join(target_path, 'winbackup_config.yaml')
+            save_path = self.config_agent.save_YAML_config(target_path)
+            print(Fore.GREEN + f" Configuration successfully saved to: " + Style.RESET_ALL + f"{save_path}")
+        except Exception as e:
+            logging.critical(f"could not save the configuration generated - exception {e}")
+            logging.critical(traceback.format_exc())
+            print(Fore.RED + " XX - Could not save configuration file. See logs. Exiting." + Style.RESET_ALL)
+            sys.exit(1)
+        
+
+    def run_from_config_file(self, path:str) -> None:
+        if not os.path.exists(path) and path.lower().endswith(('.yaml', '.yml')):
+            logging.critical(f"Config file does not exist or is not a YAML file at {path}. Exiting.")
+            logging.debug(traceback.format_exc())
+            sys.exit(1)
+
+        try:
+            global_config, target_config = self.config_agent.parse_YAML_config_file(path)
+            logging.debug(f'config successfully loaded from file at {path}')
+        except Exception as e:
+            logging.critical(f"could not load config from file {path}. Exiting.")
+            logging.critical(traceback.format_exc())
+            print(Fore.RED + " XX - Could not load config from file. See logs. Exiting." + Style.RESET_ALL)
+            sys.exit(1)
+
+        self.cli(config_set=True)
+
+
+    def cli(self, config_set:bool=False) -> None:
         signal.signal(signal.SIGINT, self._ctrl_c_handler)
         self.cli_header(self.output_path, self.output_folder_name, self.start_time)
-        self.config_agent._target_config = self.cli_config(self.config_agent._target_config)
-        self.config_agent.encryption_password = self.cli_get_password()
+        if not config_set:
+            logging.debug(f"Config not set - getting config interactively")
+            self.config_agent.target_config = self.cli_config(self.config_agent.target_config)
+            self.config_agent.encryption_password = self.cli_get_password()
+            if len(self.config_agent.encryption_password) != 0:
+                self.config_agent.global_config['encryption_enabled'] = True
+        else:
+            logging.debug(f"Config already set - using config from config_agent")
+            if self.config_agent.global_config['encryption_enabled'] and len(self.config_agent.encryption_password) == 0:
+                logging.debug(f"encryption enabled but key length 0 - get password from cli")
+                self.config_agent.encryption_password = self.cli_get_password()
+            else:
+                logging.debug(f"encryption disabled or password set - skip getting from cli")
        
         if self._recursive_loop_check(self.output_path, self.config_agent._target_config):
             print(Fore.RED + " XX - Output path is a child of a path that will be backed up. This will case an infinite loop. Choose a different path." + Style.RESET_ALL)

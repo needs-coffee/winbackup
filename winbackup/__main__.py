@@ -36,10 +36,11 @@ def get_commandline_arguments() -> dict:
     {} - Licence: {} """.format(__version__, __copyright__, __license__)
 
     parser = ArgumentParser(description=helpstring, formatter_class=RawTextHelpFormatter)
-    parser.add_argument("path", type=str, help="The Path that should contain the output", nargs="?")
+    parser.add_argument("path", type=str, help="The Path that should contain the backup", nargs="?", default=".")
     parser.add_argument('-a', '--all', help="Backup all options selectable.", action="store_true")
-    parser.add_argument('-c', '--configfile', help="supply a configfile.", nargs=1)
-    parser.add_argument('-C', '--create-configfile', help="Generate default configfile.", action="store_true")
+    parser.add_argument('-c', '--configfile', help="supply a configuration file.", action="store_true")
+    parser.add_argument('-C', '--create-configfile', help="Generate default configuration file. If no path given will save to PWD.", action="store_true")
+    parser.add_argument('-i', '--interactive-config', help="Generate a configuration file interactively", action="store_true")
     parser.add_argument('-v', '--verbose', help="Enable verbose logging.", action="store_true") #?store_const
     parser.add_argument('-V', '--version', action='version', version=__version__)
     args = vars(parser.parse_args())
@@ -48,9 +49,13 @@ def get_commandline_arguments() -> dict:
 
 def cli():
     cli_args = get_commandline_arguments()
-    win_backup = winbackup.WinBackup(cli_args)    
-    if cli_args['create_configfile']:
-        win_backup.generate_configfile()
+    win_backup = winbackup.WinBackup(cli_args)
+    if cli_args['configfile']:
+        win_backup.run_from_config_file(cli_args['path'])
+    elif cli_args['create_configfile']:
+        win_backup.generate_blank_configfile(cli_args['path'])
+    elif cli_args['interactive_config']:
+        win_backup.interactive_config_builder(cli_args['path'])
     else:
         win_backup.cli()
     
