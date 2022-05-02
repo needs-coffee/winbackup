@@ -39,19 +39,18 @@ class ConfigAgent:
         # type - folder = single folder target, special = specific backup function (reqiring specific methods) 
         # path - backup target path
         # enabled - if the target will be backed up, default false for all
-        # hidden - if a specific target is impossible, set as hidden and don't show in config
         # dict_size and mx_level - 7z dictionary size and compression level (See 7z cli docs for explanation)
         # full path - store the full path to the compressed files. Defaults to relative paths.
 
         self._base_target_config = {
-        '01_config': {'name': 'Config', 'type': 'special', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '10_documents': {'name': 'Documents', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '11_desktop': {'name': 'Desktop', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '12_pictures': {'name': 'Pictures', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},
-        '13_downloads': {'name': 'Downloads', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
-        '14_videos': {'name': 'Videos', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
-        '15_music': {'name': 'Music', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
-        '16_saved_games': {'name': 'Saved Games', 'type': 'folder', 'path': None, 'enabled': False, 'hidden': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '01_config': {'name': 'Config', 'type': 'special', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '10_documents': {'name': 'Documents', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '11_desktop': {'name': 'Desktop', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '12_pictures': {'name': 'Pictures', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},
+        '13_downloads': {'name': 'Downloads', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '14_videos': {'name': 'Videos', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
+        '15_music': {'name': 'Music', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '32m', 'mx_level': 4, 'full_path': False},
+        '16_saved_games': {'name': 'Saved Games', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         }
 
         self._base_global_config = {
@@ -117,7 +116,7 @@ class ConfigAgent:
         if not type(config_item) == dict:
             raise TypeError(f"config_item {config_item} not valid. Must be of type dict, is of type {type(config_item)}")
         for key in config_item:
-            if key not in {'name', 'type', 'path', 'enabled', 'hidden', 'dict_size', 'mx_level', 'full_path'}:
+            if key not in {'name', 'type', 'path', 'enabled', 'dict_size', 'mx_level', 'full_path'}:
                 raise ValueError(f"Key {key} in config_item not permitted.")
     
         if not config:
@@ -234,7 +233,7 @@ class ConfigAgent:
             
         for id, config_item in config.items():
             ## check config_items have valid keys and that all keys are present.
-            valid_keys = {'name', 'type', 'path', 'enabled', 'hidden', 'dict_size', 'mx_level', 'full_path'}
+            valid_keys = {'name', 'type', 'path', 'enabled', 'dict_size', 'mx_level', 'full_path'}
             for key, value in config_item.items():
                 if key not in valid_keys:
                     logging.warning(f"Unknown Key {key} in config_item for {id}. This will be ignored.")
@@ -246,7 +245,7 @@ class ConfigAgent:
                 if key in  {'name', 'type', 'dict_size'}:
                     if type(value) != str:
                         valid_type = False
-                if key in {'enabled', 'hidden', 'full_path'}:
+                if key in {'enabled', 'full_path'}:
                     if type(value) != bool:
                         valid_type = False
                 if key in {'mx_level'}:
@@ -301,13 +300,6 @@ class ConfigAgent:
                         logging.error(f"Target path {path} does not exist but was specified for {id}. Check configuration.")
                         print(f"Target path {path} does not exist but was specified for {id}. Check configuration.") 
                         valid_config_flag = False
-
-
-            ## check not hidden and enabled - if enabled cannot be hidden.
-            if 'hidden' in config_item and 'enabled' in config_item:
-                if config_item['hidden'] and config_item['enabled']:
-                    logging.warning(f"Item is both hidden and enabled for {id}. Check configuration.")
-                    print(f"Item is both hidden and enabled for {id}. Check configuration.") 
 
         return valid_config_flag
 

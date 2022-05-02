@@ -79,7 +79,6 @@ class WinBackup:
             'type': 'special', 
             'path': os.path.join(self.paths['local_appdata'], 'Plex Media Server'), 
             'enabled': False, 
-            'hidden': False, 
             'dict_size': '192m', 
             'mx_level': 9, 
             'full_path': False
@@ -94,7 +93,6 @@ class WinBackup:
             'type': 'folder', 
             'path': os.path.join(os.path.expanduser('~'), 'VirtualBox VMs'), 
             'enabled': False, 
-            'hidden': False, 
             'dict_size': '128m', 
             'mx_level': 9, 
             'full_path': False
@@ -109,7 +107,6 @@ class WinBackup:
             'type': 'folder', 
             'path': None, 
             'enabled': False, 
-            'hidden': False, 
             'dict_size': '128m', 
             'mx_level': 9, 
             'full_path': True
@@ -319,8 +316,7 @@ class WinBackup:
     def cli_config(self, config:dict) -> dict:
         new_config = config.copy()
         for key, target in sorted(config.items()):
-            if not target['hidden']:
-                new_config[key]['enabled'] = self._yes_no_prompt(f"Backup {target['name']}?")
+            new_config[key]['enabled'] = self._yes_no_prompt(f"Backup {target['name']}?")
         print()
         return new_config
 
@@ -350,9 +346,8 @@ class WinBackup:
     def cli_config_summary(self, config:dict, passwd:str, path_created:bool) -> None:
         print(Fore.BLACK + Back.WHITE + " ** CONFIG SUMMARY ** " + Style.RESET_ALL + Fore.GREEN)
         for key, target in sorted(config.items()):
-            if not target['hidden']:
-                print(f" Backup {target['name']:<12} - {'Yes' if target['enabled']==True else 'No'}")
-                logging.info(f"Config > {target['name']} - {target['enabled']}")
+            print(f" Backup {target['name']:<12} - {'Yes' if target['enabled']==True else 'No'}")
+            logging.info(f"Config > {target['name']} - {target['enabled']}")
         print(f" Encryption          - {'No' if len(passwd)==0 else 'Yes'}")
         print(Style.RESET_ALL)
     
