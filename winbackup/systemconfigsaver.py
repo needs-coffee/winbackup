@@ -93,7 +93,8 @@ class SystemConfigSaver:
 
     def save_installed_programs(self, out_path:str) -> None:
         installed_output = self._command_runner(['powershell.exe', self.installed_prog_path]).replace('\r\n', '\n')
-        with open(os.path.join(out_path,'installed_programs.txt'), 'w') as out_file:
+        installed_output = installed_output.split('\n', 1)[1].strip()
+        with open(os.path.join(out_path,'installed_programs.csv'), 'w') as out_file:
             out_file.write(installed_output)
         print(' > Installed Programs saved.')
         logging.info('Installed Programs Saved.')
