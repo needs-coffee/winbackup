@@ -117,8 +117,8 @@ class WinBackup:
         """
         loop_limit = 5
         while (1):
-            print(Fore.GREEN + " > " + 
-                "Backup output directory: " + Style.RESET_ALL, end='')
+            print(Fore.GREEN + 
+                " Backup output directory: " + Style.RESET_ALL, end='')
             reply = str(input()).strip()
             logging.debug(f"Path reply {reply}")
             if os.path.isdir(reply):
@@ -554,6 +554,10 @@ class WinBackup:
         if not root_path:
             self.config_agent.output_root_dir = self.cli_get_output_root_path()
         else:
+            if not os.path.isdir(root_path):                
+                print(Fore.RED + " Output directory must be a real path. Exiting." + Style.RESET_ALL)
+                logging.critical(f"given path {root_path} is not a real path. Exiting")
+                sys.exit(1)
             self.config_agent.output_root_dir = os.path.abspath(root_path)
         self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.config_agent.output_root_dir)
 

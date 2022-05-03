@@ -3,6 +3,7 @@ TODO.md
 removed/
 temp/
 tmp/
+*.yaml
 .ssh/
 winbackup/bin/OneNoteMdExporter/Output
 

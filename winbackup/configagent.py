@@ -21,7 +21,7 @@ import yaml
 import logging
 import traceback
 from platform import uname
-# from . import __version__
+from . import __version__
 from datetime import datetime
 
 class ConfigAgent:
@@ -430,7 +430,7 @@ class ConfigAgent:
         with open(os.path.join(path), 'w', newline='\n') as fout:
 
             ## write comments to file with winbackup version and windows version
-            # fout.write(f"# WinBackup config file \n# WinBackup Version {__version__}\n")
+            fout.write(f"# WinBackup config file \n# WinBackup Version {__version__}\n")
             fout.write(f"# Config file created: {datetime.today().strftime('%Y-%m-%d')} ")
             fout.write(f"on {uname().system} {uname().version} - {uname().node}\n")
 
