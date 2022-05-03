@@ -6,7 +6,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Test, upload and release new packages
+name: PyPI CD Release
 
 on:
   push:

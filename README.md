@@ -1,6 +1,6 @@
 # Winbackup
 
-![PyPI](https://img.shields.io/pypi/v/winbackup) ![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/needs-coffee/winbackup?include_prereleases) ![GitHub](https://img.shields.io/github/license/needs-coffee/winbackup) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/winbackup) [![Downloads](https://pepy.tech/badge/wifipasswords)](https://pepy.tech/project/winbackup)
+![PyPI](https://img.shields.io/pypi/v/winbackup) ![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/needs-coffee/winbackup?include_prereleases) ![GitHub](https://img.shields.io/github/license/needs-coffee/winbackup) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/winbackup) [![Downloads](https://pepy.tech/badge/wifipasswords)](https://pepy.tech/project/winbackup) ![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/needs-coffee/winbackup/TestRunner/main?label=build%20%28main%29) ![GitHub Workflow Status (branch)](https://img.shields.io/github/workflow/status/needs-coffee/winbackup/TestRunner/dev?label=build%20%28dev%29)
 
 A python package to back up user files on Windows to 7z archives. Useful for offsite or cloud backups and backups can be optionally encrypted with AES256. Archives can be Optionally split archives into smaller archives for easier management. As well as user files can backup Plex Media Server, Hyper-V Virtual Machines and VirtualBox Virtual Machines.
 
