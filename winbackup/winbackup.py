@@ -31,7 +31,7 @@ from colorama import Fore, Back, Style, init
 from pathlib import Path
 import humanize
 
-from . import configsaver
+from . import systemconfigsaver
 from . import zip7archiver
 from . import windowspaths
 from . import configagent
@@ -45,7 +45,7 @@ class WinBackup:
         Backup windows files to 7z archives
         """
         self.archiver = zip7archiver.Zip7Archiver()
-        self.config_saver = configsaver.ConfigSaver()
+        self.config_saver = systemconfigsaver.SystemConfigSaver()
         self.windows_paths = windowspaths.WindowsPaths()
         self.config_agent = configagent.ConfigAgent()
 
@@ -370,23 +370,28 @@ class WinBackup:
     def cli_config_summary(self, config:dict, passwd:str, path_created:bool) -> None:
         print(Fore.BLACK + Back.WHITE + " ** CONFIG SUMMARY ** " + Style.RESET_ALL + Fore.GREEN)
         for key, target in sorted(config.items()):
-            print(f" Backup {target['name']:<12} - {'Yes' if target['enabled']==True else 'No'}")
+            print(f" Backup {target['name']:<14} - {'Yes' if target['enabled']==True else 'No'}")
             logging.info(f"Config > {target['name']} - {target['enabled']}")
-        print(f" Encryption          - {'No' if len(passwd)==0 else 'Yes'}")
+        print(f" Encryption            - {'No' if len(passwd)==0 else 'Yes'}")
         print(Style.RESET_ALL)
     
         if len(passwd) <= 12 and len(passwd)!= 0:
             print(Fore.YELLOW + f" !! CAUTION - The given password is short. Consider a longer password." + Style.RESET_ALL)
+            logging.debug(f"The given password is short ({len(passwd)} chars). Consider a longer password.")
         if not path_created:
             print(Fore.YELLOW + " !! CAUTION - Output directory already exists - Contents may be destroyed if you proceed." + Style.RESET_ALL)
+            logging.info(f"Output directory already exists - Contents may be destroyed if you proceed.")
         if '30_plexserver' in config:
             if config['30_plexserver']['enabled'] and self._plex_server_running():
                 print(Fore.YELLOW + " !! CAUTION - Plex Media Server is running - Recommend stopping Plex Server before backing up." + Style.RESET_ALL)
+                logging.info("Plex Media Server is running - Recommend stopping Plex Server before backing up.")
         if '32_hypervvms' in config:
             if config['32_hypervvms']['enabled']:
                 print(Fore.YELLOW + " !! CAUTION - HyperV has been enabled - Please check VMs are stopped before running." + Style.RESET_ALL)
-            if self._hyperv_possible() and not self.check_if_admin():
-                print(Fore.CYAN + " -- INFO - HyperV detected on system. To backup HyperV run winbackup as admin." + Style.RESET_ALL)
+                logging.info("HyperV has been enabled - Please check VMs are stopped before running.")
+        if self._hyperv_possible() and not self.check_if_admin():
+            print(Fore.CYAN + " -- INFO - HyperV detected on system. To backup HyperV run winbackup as admin." + Style.RESET_ALL)
+            logging.info("HyperV detected on system. To backup HyperV run winbackup as admin.")
 
         print(Fore.CYAN + " -- INFO - Archives produced are split into 4092Mb volumes (FAT32 limitation)." + Style.RESET_ALL)
         print()      
@@ -543,6 +548,9 @@ class WinBackup:
 
 
     def cli(self, root_path=None, config_set:bool=False) -> None:
+        signal.signal(signal.SIGINT, self._ctrl_c_handler)
+        logging.debug(f"sigint connected to ctrl_c_handler")
+
         if not root_path:
             self.config_agent.output_root_dir = self.cli_get_output_root_path()
         else:
@@ -557,9 +565,6 @@ class WinBackup:
         logging.debug(f"Output path: {self.output_path}")
         logging.debug(f"Output folder name: {self.output_folder_name}")
         logging.debug(f"path created? {self.path_created}")
-
-        signal.signal(signal.SIGINT, self._ctrl_c_handler)
-        logging.debug(f"sigint connected to ctrl_c_handler")
 
         self.cli_header(self.output_path, self.output_folder_name, self.start_time)
 

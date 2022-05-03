@@ -19,13 +19,15 @@ import os
 import subprocess
 from colorama import Fore, Style
 import logging
+import traceback
 import shutil
 
-class ConfigSaver:
+class SystemConfigSaver:
     def __init__(self, config_save_path=None) -> None:
         """
+        Saves system configuration to files for backup.
         Config save path should be an empty folder to save all config files/folders to.
-        Within the winbackup script -> create 'config' folder, save config, 7z config, delete config folder..
+        Within the winbackup script -> create 'config' folder, save config, 7z config, delete config folder.
         """
         self.config_save_path = config_save_path
         self.winfetch_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'scripts', 'winfetch.ps1')
@@ -218,14 +220,20 @@ class ConfigSaver:
                             stderr=subprocess.PIPE).stderr.decode('utf-8', errors='ignore').replace('\r\n', '\n')
 
             if not 'Unable to perform operation.' in batreport:
-                print(' > Battery report saved.')
-                logging.info('Battery report Saved.')
+                print(" > Battery report saved.")
+                logging.info("Battery report Saved.")
+            elif 'media pool is empty' in batreport:
+                print(" - skipping battery report - this is not a battery powered device.")
+                logging.info("skipping battery report - this is not a battery powered device.")
             else:
-                print(Fore.RED + " XX unable to save battery report (Is this a battery powered device?)" + Style.RESET_ALL)
-                logging.warning("Unable to save battery report (Is this a battery powered device?)")
+                print(Fore.RED + " XX unable to save battery report with unknown error (Is this a battery powered device?)" + Style.RESET_ALL)
+                logging.error("Unable to save battery report with unknown error (Is this a battery powered device?)")
+                logging.debug(f"battery report response unknown: {batreport}")
+                raise ValueError("unknown response from batreport")
         except Exception as e:
             print(Fore.RED + ' XX unable to backup battery report.' + Style.RESET_ALL)
             logging.warning(f'Unable to save battery report. Exception: {e}')        
+            logging.debug(traceback.format_exc())
 
 
 if __name__ == '__main__':
@@ -239,7 +247,7 @@ if __name__ == '__main__':
     if not os.path.isdir(os.path.join('.','tmp_test', 'config')):
         os.makedirs(os.path.join('.', 'tmp_test', 'config'))
 
-    config_saver = ConfigSaver(os.path.join('tmp_test', 'config'))
+    config_saver = SystemConfigSaver(os.path.join('tmp_test', 'config'))
     print(f'winfetch path {config_saver.winfetch_path}')
     print(f'Videos path: {config_saver.videos_path}')
     config_saver.set_videos_directory_path(os.path.join('D:/', 'Videos'))

@@ -52,7 +52,7 @@ class ConfigAgent:
         }
 
         self._base_target_config = {
-        '01_config': {'name': 'Config', 'type': 'special', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
+        '01_config': {'name': 'System Config', 'type': 'special', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '10_documents': {'name': 'Documents', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '11_desktop': {'name': 'Desktop', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '192m', 'mx_level': 9, 'full_path': False},
         '12_pictures': {'name': 'Pictures', 'type': 'folder', 'path': None, 'enabled': False, 'dict_size': '32m', 'mx_level': 5, 'full_path': False},

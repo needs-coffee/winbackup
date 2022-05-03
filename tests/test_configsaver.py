@@ -8,12 +8,12 @@ import unittest
 import os
 import sys
 from tempfile import TemporaryDirectory
-import winbackup.configsaver
+import winbackup.systemconfigsaver
 
 class TestValidOutput(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.config_saver = winbackup.configsaver.ConfigSaver()
+        self.config_saver = winbackup.systemconfigsaver.SystemConfigSaver()
 
 
     def test_command_runner(self):
@@ -148,7 +148,7 @@ class TestValidOutput(unittest.TestCase):
 class TestReturnType(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.config_saver = winbackup.configsaver.ConfigSaver()
+        self.config_saver = winbackup.systemconfigsaver.SystemConfigSaver()
 
 
     def test_command_runner_returns_str(self):
