@@ -178,7 +178,7 @@ class Zip7Archiver:
 
 
     def backup_plex_folder(self, filename:str, in_folder_path:str, out_folder:str, 
-                        password:str='', dict_size:str='128m', mx_level:int=5, quiet:bool=False) -> tuple[int, int]:
+                        password:str='', dict_size:str='128m', mx_level:int=5, quiet:bool=False) -> tuple:
         # From testing - backing up plex database mx9 md128m takes 10gb of ram, mx9 md192m fails memory allocation on 16gb pc.
         #plex server files should be tarballed before compression as compressing disk files causes issues when restoring.
         tar_filename = filename[:-3] + '.tar'

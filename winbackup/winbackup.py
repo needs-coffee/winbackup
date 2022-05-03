@@ -270,7 +270,7 @@ class WinBackup:
 
 
     @staticmethod
-    def _create_output_directory(output_dir:str) -> tuple[str, str, bool]:
+    def _create_output_directory(output_dir:str) -> tuple:
         """
         takes the tgt output dir and creates an output path
         returns the path and folder_name and a flag indicating if the path needed created.
