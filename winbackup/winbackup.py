@@ -17,12 +17,14 @@
 import os
 import sys
 import signal
+import shutil
 import logging
 import ctypes
 import getpass
 import hashlib
 import subprocess
 import traceback
+from io import StringIO
 from datetime import datetime
 from send2trash import send2trash
 from colorama import Fore, Back, Style, init
@@ -35,13 +37,10 @@ from . import windowspaths
 from . import configagent
 from . import __version__
 
-DEFAULT_LOG_LEVEL = logging.DEBUG
-
 init(autoreset=False)
 
-
 class WinBackup:
-    def __init__(self, args:dict) -> None:
+    def __init__(self, log_level) -> None:
         """
         Backup windows files to 7z archives
         """
@@ -49,23 +48,11 @@ class WinBackup:
         self.config_saver = configsaver.ConfigSaver()
         self.windows_paths = windowspaths.WindowsPaths()
         self.config_agent = configagent.ConfigAgent()
-        self.args = args
 
-        self.config_agent.output_root_dir = self.get_output_path_argument(args)
-        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.config_agent.output_root_dir)
-
-        if args['verbose']:
-            log_level = logging.DEBUG
-        else:
-            log_level = DEFAULT_LOG_LEVEL
-        self._start_logger(log_level, self.output_path)   
-       
-        logging.debug(f'Output Root Dir: {self.config_agent.output_root_dir}')
-        logging.debug(f'Output path: {self.output_path}')
-        logging.debug(f'Output folder name: {self.output_folder_name}')
-        logging.debug(f'path created? {self.path_created}')
-        logging.debug(f"CLI Args: {args}")
-
+        self.log_buffer = StringIO()
+        self.log_level = log_level
+        self.logger_tempfile = self._start_logger(log_level)   
+    
         self.paths = self.windows_paths.get_paths()
         self.config_agent.update_config_paths(self.paths)
         self.config_agent.encryption_password = ''
@@ -123,37 +110,90 @@ class WinBackup:
         sys.exit(1)        
 
 
-    def get_output_path_argument(self, args:dict) -> str:
+    def cli_get_output_root_path(self) -> str:
         """
         check the first argument is a real path, if not exit
         if is a path - return path
         """
-        path = args['path']
-        if not path:
-            print(Fore.RED + " ERROR - First argument must be the output folder path" + Style.RESET_ALL)
-            sys.exit(1)
-        else:
-            if os.path.isdir(path):
-                return os.path.abspath(path)
-            else:
-                print(Fore.RED + "ERROR - first argument is not a valid folder" + Style.RESET_ALL)
+        loop_limit = 5
+        while (1):
+            print(Fore.GREEN + " > " + 
+                "Backup output directory: " + Style.RESET_ALL, end='')
+            reply = str(input()).strip()
+            logging.debug(f"Path reply {reply}")
+            if os.path.isdir(reply):
+                path = os.path.abspath(reply)
+                break
+            else:    
+                print(Fore.RED + " Output directory must be a real path. Ctrl+C to exit." + Style.RESET_ALL)
+                loop_limit -= 1
+                logging.debug(f"loop limit = {loop_limit}")
+            if loop_limit <= 0:
+                print(Fore.RED + " ERROR - Too many incorrect attempts. Exiting" + Style.RESET_ALL)
                 sys.exit(1)
+        logging.debug(f"CLI path given: {path}")
+        return path
 
 
-    def _start_logger(self, log_level, output_path:str):
+
+    def _start_logger(self, log_level) -> None:
+        """
+        if log level is debug, write logger to file in pwd unless a backup is run, then move file to backup output dir    
+        if log level is info or above, write logger to buffer and flush to disk in backup output dir when backup is run.
+        """
+
+        #get the root logger
+        logger = logging.getLogger()
+        logger.setLevel(log_level)
+
+
         if log_level == logging.DEBUG:
             log_format = "%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s"
+            log_handler = logging.FileHandler(os.path.join(os.getcwd(), 'winbackup.log'),
+                                                mode='w',
+                                                encoding='utf-8')
         else:
             log_format = "%(asctime)s - %(levelname)s -> %(message)s"
+            log_handler = logging.StreamHandler(self.log_buffer)
 
-        logging.basicConfig(filename=os.path.join(output_path, 'winbackup.log'), 
-                encoding='utf-8',
-                filemode='w', 
-                format=log_format,
-                level=log_level)
+        formatter = logging.Formatter(log_format)
+        log_handler.setFormatter(formatter)
+        logger.addHandler(log_handler)
+        logging.debug("Log Handler Started")
+
+
+    def _redirect_logger(self, out_path, log_level) -> None:
+        logging.debug("Log Handler Redirect Started")
+        logger = logging.getLogger()
         
-        logging.info("WINDOWS BACKUP - v" + __version__)
-        logging.info(f"Output Folder: {output_path}") 
+        # remove root log handlers
+        for handler in logger.handlers:
+            logger.removeHandler(handler)
+            handler.close()
+        
+        logger.setLevel(log_level)
+        if log_level == logging.DEBUG:
+            # move temp log in cwd to output path
+            shutil.move(os.path.join(os.getcwd(), 'winbackup.log'), 
+                        os.path.join(out_path, 'winbackup.log'))
+            # create new handler to append to the new log location
+            log_format = "%(asctime)s - %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] -> %(message)s"
+        else:
+            # write the log buffer to disk and close the buffer
+            with open(os.path.join(out_path, 'winbackup.log'), 'w', encoding='utf-8') as fout:
+                self.log_buffer.seek(0)
+                shutil.copyfileobj(self.log_buffer, fout)
+                self.log_buffer.close()
+            log_format = "%(asctime)s - %(levelname)s -> %(message)s"
+                               
+        # create new handler to append the rest of the log in the output dir
+        log_handler = logging.FileHandler(os.path.join(out_path, 'winbackup.log'),
+                                mode='a',
+                                encoding='utf-8')
+        formatter = logging.Formatter(log_format)
+        log_handler.setFormatter(formatter)
+        logger.addHandler(log_handler)
+        logging.debug(f"Log Handler Redirected to: {os.path.join(out_path, 'winbackup.log')}")
 
 
     def _hyperv_possible(self) -> bool:
@@ -350,7 +390,19 @@ class WinBackup:
 
         print(Fore.CYAN + " -- INFO - Archives produced are split into 4092Mb volumes (FAT32 limitation)." + Style.RESET_ALL)
         print()      
- 
+
+    @staticmethod
+    def remove_existing_archive(filename, path):
+        paths_to_remove = [os.path.join(path, file) for file in os.listdir(path) if file.startswith(filename)]
+        logging.debug(f"existing archives to be removed before backing up: {len(paths_to_remove)}")
+        for path in paths_to_remove:
+            try:
+                send2trash(path)
+                logging.debug(f"deleted file: {path}")
+            except Exception as e:
+                logging.error(f"could not delete file: {path}, exception {e}")
+                logging.debug(traceback.format_exc())
+
 
     def backup_run(self, config:dict, out_path:str, passwd:str, quiet:bool=False) -> None:
         for key, target in sorted(config.items()):
@@ -359,9 +411,10 @@ class WinBackup:
                     print(Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL)
                 logging.info(f"Backup starting - {target['name']}")
                 filename = self._create_filename(target['name'].replace(' ', ''))
-              
+
                 if target['type'] == 'folder':
                     try:
+                        self.remove_existing_archive(filename, out_path)
                         self.archiver.backup_folder(filename,
                                                     target['path'], out_path, passwd, dict_size=target['dict_size'], 
                                                     mx_level=target['mx_level'], full_path=target['full_path'], quiet=quiet)
@@ -372,6 +425,7 @@ class WinBackup:
                     if key == '01_config':
                         config_path = os.path.join(out_path, 'config')
                         os.mkdir(config_path)
+                        self.remove_existing_archive(filename, out_path)
                         self.config_saver.save_config_files(config_path, quiet=quiet)
                         try: 
                             self.archiver.backup_folder(filename,
@@ -391,8 +445,7 @@ class WinBackup:
                         except Exception as e:
                             logging.error(f"backup {filename} failed. Exception: {e}")
                             print(Fore.RED + f" XX - Backup {filename} failed. See logs."  + Style.RESET_ALL)                                                        
-                    # elif key == '32_hypervvms':
-                    #     pass
+
                     # elif key == '33_onenote':
                     #     pass
                 if not quiet:
@@ -426,9 +479,10 @@ class WinBackup:
     def generate_blank_configfile(self, path=None):
         if not path:
             path = os.getcwd()
-        config_file_path = os.path.join(path, 'winbackup_config.yaml')
-        if self._yes_no_prompt(f"Save default configuration to {config_file_path}?"):
-            save_path = self.config_agent.save_YAML_config(config_file_path)
+        if os.path.isdir(path):
+            path = os.path.join(os.path.abspath(path), 'winbackup_config.yaml')
+        if self._yes_no_prompt(f"Save default configuration to {path}?"):
+            save_path = self.config_agent.save_YAML_config(path)
             print(f"Default config winbackup_config.yaml saved to {save_path}")
 
 
@@ -438,18 +492,22 @@ class WinBackup:
         """
         print(Fore.BLACK + Back.WHITE + " WINDOWS BACKUP - v" + __version__ + " " + Style.RESET_ALL)
         print(Fore.GREEN + f" Interactive configuration builder" + Style.RESET_ALL)
-        print(Fore.GREEN + f" Generated configuration file will be saved to:" + Style.RESET_ALL + f"{target_path}")
+        if not target_path:
+            target_path = os.getcwd()
+        if os.path.isdir(target_path):
+            target_path = os.path.join(os.path.abspath(target_path), 'winbackup_config.yaml')
+        print(Fore.GREEN + f" Generated configuration file will be saved to: " + Style.RESET_ALL + f"{target_path}")
         print()
         
+
         self.config_agent.target_config = self.cli_config(self.config_agent.target_config)
         password = self.cli_get_password()
         if not len(password) == 0:
             self.config_agent.encryption_password = password
             self.config_agent.global_config['encryption_enabled'] = True
         try:
-            if os.path.isdir(target_path):
-                target_path = os.path.join(target_path, 'winbackup_config.yaml')
             save_path = self.config_agent.save_YAML_config(target_path)
+            logging.debug(f"Interactive Configuration successfully saved to: {save_path}")
             print(Fore.GREEN + f" Configuration successfully saved to: " + Style.RESET_ALL + f"{save_path}")
         except Exception as e:
             logging.critical(f"could not save the configuration generated - exception {e}")
@@ -459,26 +517,52 @@ class WinBackup:
         
 
     def run_from_config_file(self, path:str) -> None:
-        if not os.path.exists(path) and path.lower().endswith(('.yaml', '.yml')):
-            logging.critical(f"Config file does not exist or is not a YAML file at {path}. Exiting.")
-            logging.debug(traceback.format_exc())
+        if path:
+            if os.path.exists(path) and path.lower().endswith(('.yaml', '.yml')):
+                logging.debug("Valid config path given")
+                path = os.path.abspath(path)
+            else:
+                logging.critical(f"Config file does not exist or is not a YAML file at {path}. Exiting.")
+                print(Fore.RED + f" XX - Config file does not exist or is not a YAML file at {path}. Exiting." + Style.RESET_ALL)
+                sys.exit(1)
+        else:
+            logging.critical(f"Must give path to configuration file, none given. Exiting.")
+            print(Fore.RED + f" XX - Must give path to configuration file. Exiting." + Style.RESET_ALL)
             sys.exit(1)
 
         try:
             global_config, target_config = self.config_agent.parse_YAML_config_file(path)
             logging.debug(f'config successfully loaded from file at {path}')
         except Exception as e:
-            logging.critical(f"could not load config from file {path}. Exiting.")
+            logging.critical(f"could not load config from file {path}. Exiting. Exception {e}")
             logging.critical(traceback.format_exc())
             print(Fore.RED + " XX - Could not load config from file. See logs. Exiting." + Style.RESET_ALL)
             sys.exit(1)
 
-        self.cli(config_set=True)
+        self.cli(self.config_agent.output_root_dir, config_set=True)
 
 
-    def cli(self, config_set:bool=False) -> None:
+    def cli(self, root_path=None, config_set:bool=False) -> None:
+        if not root_path:
+            self.config_agent.output_root_dir = self.cli_get_output_root_path()
+        else:
+            self.config_agent.output_root_dir = os.path.abspath(root_path)
+        self.output_path, self.output_folder_name, self.path_created = self._create_output_directory(self.config_agent.output_root_dir)
+
+        self._redirect_logger(self.output_path, self.log_level)
+
+        logging.info("WINDOWS BACKUP - v" + __version__)
+        logging.info(f"Output Folder: {self.output_path}") 
+        logging.debug(f"Output Root Dir: {self.config_agent.output_root_dir}")
+        logging.debug(f"Output path: {self.output_path}")
+        logging.debug(f"Output folder name: {self.output_folder_name}")
+        logging.debug(f"path created? {self.path_created}")
+
         signal.signal(signal.SIGINT, self._ctrl_c_handler)
+        logging.debug(f"sigint connected to ctrl_c_handler")
+
         self.cli_header(self.output_path, self.output_folder_name, self.start_time)
+
         if not config_set:
             logging.debug(f"Config not set - getting config interactively")
             self.config_agent.target_config = self.cli_config(self.config_agent.target_config)
@@ -493,13 +577,13 @@ class WinBackup:
             else:
                 logging.debug(f"encryption disabled or password set - skip getting from cli")
        
-        if self._recursive_loop_check(self.output_path, self.config_agent._target_config):
+        if self._recursive_loop_check(self.output_path, self.config_agent.target_config):
             print(Fore.RED + " XX - Output path is a child of a path that will be backed up. This will case an infinite loop. Choose a different path." + Style.RESET_ALL)
             logging.critical("Output path is a child of path that will be backed up. This will case an infinite loop. Choose a different path.")
             print(" Aborted. Exiting.")
             sys.exit(0)
        
-        self.cli_config_summary(self.config_agent._target_config, 
+        self.cli_config_summary(self.config_agent.target_config, 
                             self.config_agent.encryption_password, 
                             self.path_created)
        
@@ -511,7 +595,7 @@ class WinBackup:
         print('-' * 40)
         print()
 
-        self.backup_run(self.config_agent._target_config, 
+        self.backup_run(self.config_agent.target_config, 
                         self.output_path, 
                         self.config_agent.encryption_password, 
                         False)
