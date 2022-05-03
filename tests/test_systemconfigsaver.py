@@ -68,7 +68,7 @@ class TestValidOutput(unittest.TestCase):
         """
         with TemporaryDirectory() as temp_directory:
             response = self.config_saver.save_installed_programs(temp_directory)
-            with open(os.path.join(temp_directory, 'installed_programs.txt'), 'r') as fin:
+            with open(os.path.join(temp_directory, 'installed_programs.csv'), 'r') as fin:
                 for line in fin.readlines():
                     if line.startswith('DisplayName'):
                         self.assertTrue('DisplayVersion' in line)

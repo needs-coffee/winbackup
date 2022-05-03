@@ -20,7 +20,7 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from . import __version__, __license__, __copyright__
 from . import winbackup
 
-DEFAULT_LOG_LEVEL = logging.DEBUG
+DEFAULT_LOG_LEVEL = logging.INFO
 
 def get_commandline_arguments() -> dict:
     """

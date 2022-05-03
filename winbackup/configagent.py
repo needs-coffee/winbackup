@@ -129,6 +129,16 @@ class ConfigAgent:
             if key not in {'name', 'type', 'path', 'enabled', 'dict_size', 'mx_level', 'full_path'}:
                 raise ValueError(f"Key {key} in config_item not permitted.")
 
+        if not re.match('(\d{2}_[a-z_]+)', config_item_id):
+            raise ValueError(f"Invalid config_item_id: {config_item_id}. must be in the format 00_name or 00_long_name")
+    
+
+        if config_item['name'] == None:
+            raise ValueError("Name is required for config_item to be added to target_config")
+        if config_item['type'] == 'folder':
+            if config_item['path'] == None:
+                raise ValueError("path is required for config_item with type folder to be added to target_config")
+       
         if not config:
             if not self._target_config:
                 config = self._base_target_config
@@ -139,12 +149,6 @@ class ConfigAgent:
         new_config_item.update(config_item)
         logging.debug(f"config_item argument - {config_item}")
         logging.debug(f"combined config item - {new_config_item}")
-
-        if config_item['name'] == None:
-            raise ValueError("Name is required for config_item to be added to target_config")
-        if config_item['type'] == 'folder':
-            if config_item['path'] == None:
-                raise ValueError("path is required for config_item with type folder to be added to target_config")
 
         try:
             config[config_item_id] = new_config_item
@@ -309,13 +313,13 @@ class ConfigAgent:
                 if not 0 <= config_item['mx_level'] <= 9:
                     logging.error(f"mx_level {config_item['mx_level']} for {id} not valid. Must be in range 0-9.")
                     print(f"mx_level {config_item['mx_level']} for {id} not valid. Must be in range 0-9.") 
-
+                    valid_config_flag = False
             ## check dict_size is valid
             if 'dict_size' in config_item:
                 if not re.match('(^\d+[bkmg]?$)', config_item['dict_size']):
                     logging.error(f"dict_size {config_item['dict_size']} for {id} not valid. Must int followed by quantifier in bkmg")
                     print(f"dict_size {config_item['dict_size']} for {id} not valid. Must int followed by quantifier in bkmg") 
-
+                    valid_config_flag = False
             ## check paths in target_config exist and are readable
             if 'path' in config_item and config_item['path'] != None:
                 path_value = config_item['path']
