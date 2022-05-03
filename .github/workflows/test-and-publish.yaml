@@ -44,7 +44,7 @@ jobs:
   deploy-package:
     name: Build and publish to PyPI
     needs: test-package
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
 
     steps:
@@ -70,7 +70,7 @@ jobs:
 
   create-release:
     name: Create new GH release
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: [test-package, deploy-package]
     steps:
       - name: Checkout code
