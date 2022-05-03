@@ -38,6 +38,7 @@ Tests
 To run unitests
 ```shell
 python -m unittest discover tests -v
+python -m pytest tests -v 
 ```
 
 Build Packages
