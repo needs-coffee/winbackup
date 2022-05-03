@@ -101,7 +101,7 @@ class TestValidOutput(unittest.TestCase):
             response = self.config_saver.save_path_env(temp_directory)
             self.assertTrue(os.path.exists(os.path.join(temp_directory, 'path.txt')))
 
-
+    @unittest.skipIf(not os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh')))
     def test_save_ssh_directory(self):
         with TemporaryDirectory() as temp_directory:
             response = self.config_saver.save_ssh_directory(temp_directory)

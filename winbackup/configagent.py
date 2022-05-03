@@ -442,7 +442,7 @@ class ConfigAgent:
         return path
 
 
-    def parse_YAML_config_file(self, path:str) -> tuple[dict, dict]:
+    def parse_YAML_config_file(self, path:str) -> tuple:
         """
         Parse the YAML config from file and return as a tuple of dictionaries (global, target)
         config file is also saved within class instance as self.config

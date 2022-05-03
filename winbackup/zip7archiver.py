@@ -53,7 +53,7 @@ class Zip7Archiver:
 
     def backup_folder(self, filename:str, in_folder_path:Union[str,list], out_folder:str, 
                     password:str='', dict_size:str='192m', mx_level:int=9, full_path:bool=False, 
-                    split:bool=True, split_force:bool=False, quiet:bool=False) -> tuple[int, int]:
+                    split:bool=True, split_force:bool=False, quiet:bool=False) -> tuple:
         """
         Main function for creating 7z archives.
         Uses TQDM to display the progress to the console.
