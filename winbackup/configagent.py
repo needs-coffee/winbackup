@@ -130,14 +130,7 @@ class ConfigAgent:
                 raise ValueError(f"Key {key} in config_item not permitted.")
 
         if not re.match('(\d{2}_[a-z_]+)', config_item_id):
-            raise ValueError(f"Invalid config_item_id: {config_item_id}. must be in the format 00_name or 00_long_name")
-    
-
-        if config_item['name'] == None:
-            raise ValueError("Name is required for config_item to be added to target_config")
-        if config_item['type'] == 'folder':
-            if config_item['path'] == None:
-                raise ValueError("path is required for config_item with type folder to be added to target_config")
+            raise ValueError(f"Invalid config_item_id: {config_item_id}. must be in the format 00_name or 00_long_name")  
        
         if not config:
             if not self._target_config:
@@ -147,6 +140,13 @@ class ConfigAgent:
 
         new_config_item = self._base_config_item.copy()
         new_config_item.update(config_item)
+
+        if new_config_item['name'] == None:
+            raise ValueError("Name is required for config_item to be added to target_config")
+        if new_config_item['type'] == 'folder':
+            if new_config_item['path'] == None:
+                raise ValueError("path is required for config_item with type folder to be added to target_config")
+
         logging.debug(f"config_item argument - {config_item}")
         logging.debug(f"combined config item - {new_config_item}")
 
