@@ -12,7 +12,7 @@ A python package to back up user files on Windows to 7z archives. Useful for off
 
 Installation
 ------------
-Installation is from a package on GitHub Releases or from pip with ``pip install winbackup``
+Installation is from a package on GitHub Releases or from [pip](https://pypi.org/project/winbackup/) with ``pip install winbackup``
 
 Usage
 -----
