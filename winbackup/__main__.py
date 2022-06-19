@@ -43,12 +43,12 @@ def get_cli_args() -> dict:
     # fmt: off
     parser = ArgumentParser(description=helpstring, formatter_class=RawTextHelpFormatter)
     parser.add_argument("path", type=str, help="The Path that should contain the backup", nargs="?") # noqa: 950
-    parser.add_argument('-a', '--all', help="Backup all options selectable.", action="store_true") # noqa: 950
-    parser.add_argument('-c', '--configfile', help="supply a configuration file.", action="store_true") # noqa: 950
-    parser.add_argument('-C', '--create-configfile', help="Generate default configuration file. If no path given will save to CWD.", action="store_true") # noqa: 950
-    parser.add_argument('-i', '--interactive-config', help="Generate a configuration file interactively", action="store_true") # noqa: 950
-    parser.add_argument('-v', '--verbose', help="Enable verbose logging. Log will initially output to the CWD.", action="store_true") # noqa: 950
-    parser.add_argument('-V', '--version', action='version', version=__version__)
+    parser.add_argument("-a", "--all", help="Backup all options selectable.", action="store_true") # noqa: 950
+    parser.add_argument("-c", "--configfile", help="supply a configuration file.", action="store_true") # noqa: 950
+    parser.add_argument("-C", "--create-configfile", help="Generate default configuration file. If no path given will save to CWD.", action="store_true") # noqa: 950
+    parser.add_argument("-i", "--interactive-config", help="Generate a configuration file interactively", action="store_true") # noqa: 950
+    parser.add_argument("-v", "--verbose", help="Enable verbose logging. Log will initially output to the CWD.", action="store_true") # noqa: 950
+    parser.add_argument("-V", "--version", action="version", version=__version__)
     args = vars(parser.parse_args())
     return args
     # fmt: on
