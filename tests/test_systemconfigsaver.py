@@ -93,16 +93,10 @@ class TestValidOutput(unittest.TestCase):
 
     def test_save_path_env(self):
         with TemporaryDirectory() as temp_directory:
-<<<<<<< HEAD
-            response = self.config_saver.save_path_env(temp_directory)
-            self.assertTrue(os.path.exists(os.path.join(temp_directory, 'path.txt')))
-
-    @unittest.skipIf(not os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh')), ".SSH Does not exist")
-=======
             self.config_saver.save_path_env(temp_directory)
             self.assertTrue(os.path.exists(os.path.join(temp_directory, "path.txt")))
 
->>>>>>> dev-formatting
+    @unittest.skipIf(not os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh')), ".SSH Does not exist")  # fmt: skip
     def test_save_ssh_directory(self):
         with TemporaryDirectory() as temp_directory:
             self.config_saver.save_ssh_directory(temp_directory)
