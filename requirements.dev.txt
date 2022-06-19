@@ -1,0 +1,8 @@
+colorama>=0.4.4
+Send2Trash>=1.8.0
+tqdm>=4.63.0
+humanize>=4.0.0
+PyYAML>=6.0
+black>=22
+flake8>=4.0
+build>=0.8
