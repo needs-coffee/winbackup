@@ -20,25 +20,22 @@ import ctypes.wintypes
 import logging
 from uuid import UUID
 
-
-## from https://gist.github.com/mkropat/7550097
+## from https://gist.github.com/mkropat/7550097 
 ## below GUID class is under MIT licence copyright Michael Kropat (https://github.com/mkropat)
-class GUID(ctypes.Structure):  # [1]
+class GUID(ctypes.Structure):   # [1]
     _fields_ = [
         ("Data1", ctypes.wintypes.DWORD),
         ("Data2", ctypes.wintypes.WORD),
         ("Data3", ctypes.wintypes.WORD),
-        ("Data4", ctypes.wintypes.BYTE * 8),
-    ]
+        ("Data4", ctypes.wintypes.BYTE * 8)
+    ] 
 
     def __init__(self, uuid_):
         ctypes.Structure.__init__(self)
         self.Data1, self.Data2, self.Data3, self.Data4[0], self.Data4[1], rest = uuid_.fields
         for i in range(2, 8):
-            self.Data4[i] = rest >> (8 - i - 1) * 8 & 0xFF
-
-    ## end MIT licenced code
-
+            self.Data4[i] = rest>>(8 - i - 1)*8 & 0xff
+## end MIT licenced code
 
 class WindowsPaths:
     def __init__(self) -> None:
@@ -48,7 +45,7 @@ class WindowsPaths:
         i.e. if the user default videos folder has been changed, it will return the new path.
         """
         # https://docs.microsoft.com/en-us/windows/win32/shell/knownfolderid
-        # GUIDs from windows API (KnownFolderID)
+        # guids from windows API (KnownFolderID)
         self.FOLDERID_DOCUMENTS = "{FDD39AD0-238F-46AF-ADB4-6C85480369C7}"
         self.FOLDERID_PICTURES = "{33E28130-4E1E-4676-835A-98395C3BC3BB}"
         self.FOLDERID_VIDEOS = "{18989B1D-99B5-455B-841C-AB7C74E4DDFC}"
@@ -64,6 +61,7 @@ class WindowsPaths:
         self.FOLDERID_PROGRAMFILESX86 = "{7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E}"
 
         self.paths = {}
+
 
     def get_paths(self) -> dict:
         """
@@ -88,47 +86,45 @@ class WindowsPaths:
         }
         self.paths = paths
         return paths
+        
 
-    def get_windows_path(self, known_folder_id: str) -> str:
+    def get_windows_path(self, known_folder_id:str) -> str:
         """
         Takes a known_folder_id GUID as per win32 API and returns the folder path.
         SHGetKnownFolderPath is the current maintained version supported by windows
         not compatible with windows before vista.
         """
-        # KF_FLAG_DEFAULT_PATH not set by default, so will return the current path
+        #KF_FLAG_DEFAULT_PATH by default is not set, so will return the current, not default path
         # https://docs.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid
-        path = ""
+        path = ''
         # below function adapted from https://gist.github.com/mkropat/7550097 - MIT licence
         buf = ctypes.c_wchar_p(ctypes.wintypes.MAX_PATH)
         try:
             return_type = ctypes.windll.shell32.SHGetKnownFolderPath(
-                ctypes.byref(GUID(UUID(known_folder_id))),
-                ctypes.wintypes.DWORD(0),
-                ctypes.wintypes.HANDLE(0),
-                ctypes.byref(buf),
-            )
+                                                ctypes.byref(GUID(UUID(known_folder_id))), 
+                                                ctypes.wintypes.DWORD(0),
+                                                ctypes.wintypes.HANDLE(0),
+                                                ctypes.byref(buf))
             if return_type != 0:
                 raise ValueError
             path = buf.value
             ctypes.windll.ole32.CoTaskMemFree(buf)
-            logging.debug(f"KnownFolderID {known_folder_id} Path {path}")
-
+            logging.debug(f'KnownFolderID {known_folder_id} Path {path}')
+        
         except Exception as e:
-            logging.error(f"Error getting path - {e}")
+            logging.error(f'{e}')
 
         return path
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        stream=sys.stdout,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
-    )
+    logging.basicConfig(stream= sys.stdout,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    level = logging.DEBUG)
 
     windows_paths = WindowsPaths()
     paths = windows_paths.get_paths()
     for k, v in paths.items():
-        print(f"{k:<17} : {v}")
-    print("\nComplete.")
+        print(f'{k:<17} : {v}')
+    print('\nComplete.')
     sys.exit()
