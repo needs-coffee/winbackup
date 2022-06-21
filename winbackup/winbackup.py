@@ -376,10 +376,13 @@ class WinBackup:
         print(" All produced archives and files will be placed in this new folder.")
         print()
 
-    def cli_config(self, config: dict) -> dict:
+    def cli_config(self, config: dict, all_selected: bool = False) -> dict:
         new_config = config.copy()
         for key, target in sorted(config.items()):
-            new_config[key]["enabled"] = self._yes_no_prompt(f"Backup {target['name']}?")
+            if all_selected:
+                new_config[key]["enabled"] = True
+            else:
+                new_config[key]["enabled"] = self._yes_no_prompt(f"Backup {target['name']}?")
         print()
         return new_config
 
@@ -621,7 +624,7 @@ class WinBackup:
             save_path = self.config_agent.save_YAML_config(path)
             print(f"Default config winbackup_config.yaml saved to {save_path}")
 
-    def interactive_config_builder(self, target_path: str) -> None:
+    def interactive_config_builder(self, target_path: str, all_selected: bool = False) -> None:
         """
         Build a custom config from the interactive script but save as config file to path
         """
@@ -646,8 +649,15 @@ class WinBackup:
         )
         print()
 
-        self.config_agent.target_config = self.cli_config(self.config_agent.target_config)
-        password = self.cli_get_password()
+        self.config_agent.target_config = self.cli_config(
+            self.config_agent.target_config,
+            all_selected=all_selected,
+        )
+        if all_selected:
+            logging.info("all flag at CLI - Defaulting to no password")
+            password = ""
+        else:
+            password = self.cli_get_password()
         if not len(password) == 0:
             self.config_agent.encryption_password = password
             self.config_agent.global_config["encryption_enabled"] = True
@@ -670,7 +680,7 @@ class WinBackup:
             )
             sys.exit(1)
 
-    def run_from_config_file(self, path: str) -> None:
+    def run_from_config_file(self, path: str, quiet: bool = False) -> None:
         if path:
             if os.path.exists(path) and path.lower().endswith((".yaml", ".yml")):
                 logging.debug("Valid config path given")
@@ -707,9 +717,15 @@ class WinBackup:
             )
             sys.exit(1)
 
-        self.cli(self.config_agent.output_root_dir, config_set=True)
+        self.cli(self.config_agent.output_root_dir, config_set=True, quiet=quiet)
 
-    def cli(self, root_path=None, config_set: bool = False) -> None:
+    def cli(
+        self,
+        root_path=None,
+        config_set: bool = False,
+        all_selected: bool = False,
+        quiet: bool = False,
+    ) -> None:
         signal.signal(signal.SIGINT, self._ctrl_c_handler)
         logging.debug("sigint connected to ctrl_c_handler")
 
@@ -744,20 +760,27 @@ class WinBackup:
 
         if not config_set:
             logging.debug("Config not set - getting config interactively")
-            self.config_agent.target_config = self.cli_config(self.config_agent.target_config)
-            self.config_agent.encryption_password = self.cli_get_password()
+            self.config_agent.target_config = self.cli_config(
+                self.config_agent.target_config,
+                all_selected=all_selected,
+            )
+            if all_selected:
+                logging.info("all flag at CLI - Defaulting to no password")
+                self.config_agent.encryption_password = ""
+            else:
+                self.config_agent.encryption_password = self.cli_get_password()
             if len(self.config_agent.encryption_password) != 0:
                 self.config_agent.global_config["encryption_enabled"] = True
         else:
             logging.debug("Config already set - using config from config_agent")
-            if (
-                self.config_agent.global_config["encryption_enabled"]
-                and len(self.config_agent.encryption_password) == 0
-            ):
-                logging.debug("encryption enabled but key length 0 - get password from cli")
-                self.config_agent.encryption_password = self.cli_get_password()
+            if self.config_agent.global_config["encryption_enabled"]:
+                if len(self.config_agent.encryption_password) == 0:
+                    logging.debug("encryption enabled but key len 0 - get password from cli")
+                    self.config_agent.encryption_password = self.cli_get_password()
+                else:
+                    logging.debug("encryption enabled + pw set. skip getting from cli")
             else:
-                logging.debug("encryption disabled or password set - skip getting from cli")
+                logging.debug("encryption disabled - skip getting from cli")
 
         if self._recursive_loop_check(self.output_path, self.config_agent.target_config):
             print(
@@ -776,11 +799,11 @@ class WinBackup:
             self.config_agent.encryption_password,
             self.path_created,
         )
-
-        if not self._yes_no_prompt("Do you want to continue?"):
-            logging.info("Backup cancelled after summary. Exiting.")
-            print(" Aborted. Exiting.")
-            sys.exit(0)
+        if not quiet:
+            if not self._yes_no_prompt("Do you want to continue?"):
+                logging.info("Backup cancelled after summary. Exiting.")
+                print(" Aborted. Exiting.")
+                sys.exit(0)
 
         print("-" * 40)
         print()

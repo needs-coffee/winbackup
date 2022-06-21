@@ -43,12 +43,13 @@ def get_cli_args() -> dict:
 
     # fmt: off
     parser = ArgumentParser(description=helpstring, formatter_class=RawTextHelpFormatter)
-    parser.add_argument("path", type=str, help="The Path that should contain the backup", nargs="?") # noqa: 950
-    parser.add_argument("-a", "--all", help="Backup all options selectable.", action="store_true") # noqa: 950
-    parser.add_argument("-c", "--configfile", help="supply a configuration file.", action="store_true") # noqa: 950
-    parser.add_argument("-C", "--create-configfile", help="Generate default configuration file. If no path given will save to CWD.", action="store_true") # noqa: 950
-    parser.add_argument("-i", "--interactive-config", help="Generate a configuration file interactively", action="store_true") # noqa: 950
-    parser.add_argument("-v", "--verbose", help="Enable verbose logging. Log will initially output to the CWD.", action="store_true") # noqa: 950
+    parser.add_argument("path", type=str, help="The Path that should contain the backup", nargs="?")
+    parser.add_argument("-a", "--all", help="Backup all options selectable.", action="store_true")
+    parser.add_argument("-c", "--configfile", help="supply a configuration file.", action="store_true")
+    parser.add_argument("-C", "--create-configfile", help="Generate default configuration file. If no path given will save to CWD.", action="store_true")
+    parser.add_argument("-q", "--quiet", help="Run without confirmation. Defaults to no password if not run with config file.", action="store_true")
+    parser.add_argument("-i", "--interactive-config", help="Generate a configuration file interactively", action="store_true")
+    parser.add_argument("-v", "--verbose", help="Enable verbose logging. Log will initially output to the CWD.", action="store_true")
     parser.add_argument("-V", "--version", action="version", version=__version__)
     args = vars(parser.parse_args())
     return args
@@ -59,7 +60,7 @@ def cli():
     cli_args = get_cli_args()
 
     if not platform.system() == "Windows":
-        print(" Only windows is supported by this program.")
+        print(" Only Windows is supported by this program.")
         sys.exit(1)
 
     path = cli_args["path"]
@@ -70,13 +71,17 @@ def cli():
 
     win_backup = winbackup.WinBackup(log_level)
     if cli_args["configfile"]:
-        win_backup.run_from_config_file(path)
+        win_backup.run_from_config_file(path, quiet=cli_args["quiet"])
     elif cli_args["create_configfile"]:
         win_backup.generate_blank_configfile(path)
     elif cli_args["interactive_config"]:
-        win_backup.interactive_config_builder(path)
+        win_backup.interactive_config_builder(path, all_selected=cli_args["all"])
     else:
-        win_backup.cli(path)
+        win_backup.cli(
+            path,
+            all_selected=cli_args["all"],
+            quiet=cli_args["quiet"],
+        )
 
 
 if __name__ == "__main__":
