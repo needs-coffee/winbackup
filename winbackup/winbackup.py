@@ -655,6 +655,7 @@ class WinBackup:
         )
         if all_selected:
             logging.info("all flag at CLI - Defaulting to no password")
+            print("All options flag set at CLI - Defaulting to no password")
             password = ""
         else:
             password = self.cli_get_password()
@@ -754,7 +755,7 @@ class WinBackup:
         logging.debug(f"Output Root Dir: {self.config_agent.output_root_dir}")
         logging.debug(f"Output path: {self.output_path}")
         logging.debug(f"Output folder name: {self.output_folder_name}")
-        logging.debug(f"path created? {self.path_created}")
+        logging.debug(f"Path created? {self.path_created}")
 
         self.cli_header(self.output_path, self.output_folder_name, self.start_time)
 
@@ -766,6 +767,7 @@ class WinBackup:
             )
             if all_selected:
                 logging.info("all flag at CLI - Defaulting to no password")
+                print("All options flag set at CLI - Defaulting to no password")
                 self.config_agent.encryption_password = ""
             else:
                 self.config_agent.encryption_password = self.cli_get_password()
