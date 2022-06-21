@@ -16,6 +16,7 @@
 
 import sys
 import logging
+import platform
 from argparse import ArgumentParser, RawTextHelpFormatter
 from . import __version__, __license__, __copyright__
 from . import winbackup
@@ -56,6 +57,10 @@ def get_cli_args() -> dict:
 
 def cli():
     cli_args = get_cli_args()
+
+    if not platform.system() == "Windows":
+        print(" Only windows is supported by this program.")
+        sys.exit(1)
 
     path = cli_args["path"]
     if cli_args["verbose"]:
