@@ -52,7 +52,6 @@ class Zip7Archiver:
                 except Exception as e:
                     logging.error(f"Get pathsize exception - Path: {path} Exception: {e}")
         logging.debug(f"Size: {total_bytes} bytes for path: {path} ")
-        logging.debug()
         return total_bytes
 
     def _get_paths_size(self, paths: Union[str, list]) -> int:
