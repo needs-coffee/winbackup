@@ -71,8 +71,8 @@ class TestReturnType(unittest.TestCase):
                 fout.write(os.urandom(32768))
         return subfolder_path
 
-    def test_get_path_size_returns_int(self):
-        response = self.archiver._get_path_size(self.testdir_path)
+    def test_get_paths_size_returns_int(self):
+        response = self.archiver._get_paths_size(self.testdir_path)
         self.assertTrue(type(response) == int)
 
     def test_backup_folder_returns_tuple(self):
