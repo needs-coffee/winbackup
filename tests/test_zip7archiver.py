@@ -31,17 +31,26 @@ class TestValidArchive(unittest.TestCase):
     def test_backup_folder(self):
         filename = "test_backup.7z"
         self.archiver.backup_folder(
-            filename, self.testdir_path, self.temp_path, password="", quiet=True
+            filename,
+            self.testdir_path,
+            self.temp_path,
+            password="",
+            quiet=True,
         )
         self.assertTrue(os.path.isfile(os.path.join(self.temp_path, filename)))
 
-    def test_backup_plex_folder(self):
+    def test_backup_folder_tar_before(self):
         filename = "test_plex_backup.7z"
-        self.archiver.backup_plex_folder(
-            filename, self.testdir_path, self.temp_path, password="", quiet=True
+        self.archiver.backup_folder(
+            filename,
+            self.testdir_path,
+            self.temp_path,
+            password="",
+            quiet=True,
+            tar_before_7z=True,
         )
         # split force is currently set for plex server so files will end with a number
-        self.assertTrue(os.path.isfile(os.path.join(self.temp_path, filename + ".001")))
+        self.assertTrue(os.path.isfile(os.path.join(self.temp_path, filename)))
 
 
 class TestReturnType(unittest.TestCase):
@@ -69,16 +78,6 @@ class TestReturnType(unittest.TestCase):
     def test_backup_folder_returns_tuple(self):
         response = self.archiver.backup_folder(
             "test_backup_return.7z", self.testdir_path, self.temp_path, password="", quiet=True
-        )
-        self.assertTrue(type(response) == tuple)
-
-    def test_backup_plex_folder_returns_tuple(self):
-        response = self.archiver.backup_plex_folder(
-            "test_backup_plex_return.7z",
-            self.testdir_path,
-            self.temp_path,
-            password="",
-            quiet=True,
         )
         self.assertTrue(type(response) == tuple)
 
