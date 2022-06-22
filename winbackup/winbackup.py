@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see < https: // www.gnu.org/licenses/>.
 
+from email.policy import default
 import os
 import sys
 import signal
@@ -68,8 +69,12 @@ class WinBackup:
         ## ** Plex Specific setup
         plex_config_item = {
             "name": "Plex Server",
-            "type": "special",
+            "type": "folder",
             "path": os.path.join(self.paths["local_appdata"], "Plex Media Server"),
+            "dict_size": "128m",
+            "mx_level": 5,
+            "tar_before_7z": True,
+            "extra_tar_flags": ["-xr!Cache*", "-xr!Updates", "-xr!Crash*"],
         }
         if os.path.exists(os.path.join(self.paths["local_appdata"], "Plex Media Server")):
             logging.debug("Plex item added to config")
@@ -509,85 +514,51 @@ class WinBackup:
         quiet: bool = False,
     ) -> None:
         for key, target in sorted(config.items()):
-            if target["enabled"]:
-                if not quiet:
-                    print(
-                        Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL
-                    )
-                logging.info(f"Backup starting - {target['name']}")
-                filename = self._create_filename(target["name"].replace(" ", ""))
+            if not target["enabled"]:
+                continue
 
-                if target["type"] == "folder":
-                    try:
-                        self.remove_existing_archive(filename, out_path)
-                        self.archiver.backup_folder(
-                            filename,
-                            target["path"],
-                            out_path,
-                            passwd,
-                            dict_size=target["dict_size"],
-                            mx_level=target["mx_level"],
-                            full_path=target["full_path"],
-                            quiet=quiet,
-                        )
-                    except Exception as e:
-                        logging.error(f"backup {filename} failed. Exception: {e}")
-                        print(
-                            Fore.RED
-                            + f" XX - Backup {filename} failed. See logs."
-                            + Style.RESET_ALL
-                        )
-                else:
-                    if key == "01_config":
-                        config_path = os.path.join(out_path, "config")
-                        os.mkdir(config_path)
-                        self.remove_existing_archive(filename, out_path)
-                        self.config_saver.save_config_files(config_path, quiet=quiet)
-                        try:
-                            self.archiver.backup_folder(
-                                filename,
-                                config_path,
-                                out_path,
-                                passwd,
-                                dict_size=target["dict_size"],
-                                mx_level=target["mx_level"],
-                                full_path=target["full_path"],
-                                quiet=quiet,
-                            )
-                        except Exception as e:
-                            logging.error(f"backup {filename} failed. Exception: {e}")
-                            print(
-                                Fore.RED
-                                + f" XX - Backup {filename} failed. See logs."
-                                + Style.RESET_ALL
-                            )
+            if not quiet:
+                print(Fore.GREEN + f" >>> Backing up {target['name']} ... " + Style.RESET_ALL)
+            logging.info(f"Backup starting - {target['name']}")
+            filename = self._create_filename(target["name"].replace(" ", ""))
+            if target["type"] == "special" and key == "01_config":
+                try:
+                    config_path = os.path.join(out_path, "config")
+                    os.mkdir(config_path)
+                    self.config_saver.save_config_files(config_path, quiet=quiet)
+                    in_target_path = str(config_path)
+                except Exception as e:
+                    logging.debug(f"could not backup config - Exception {e}")
+            else:
+                config_path = None
+                in_target_path = target["path"]
+            try:
+                self.remove_existing_archive(filename, out_path)
+                self.archiver.backup_folder(
+                    filename,
+                    in_target_path,
+                    out_path,
+                    passwd,
+                    dict_size=target["dict_size"],
+                    mx_level=target["mx_level"],
+                    full_path=target["full_path"],
+                    quiet=quiet,
+                    tar_before_7z=target.get("tar_before_7z", False),
+                    extra_tar_flags=target.get("extra_tar_flags", []),
+                    extra_7z_flags=target.get("extra_7z_flags", []),
+                )
+            except Exception as e:
+                logging.error(f"backup {filename} failed. Exception: {e}")
+                logging.debug(traceback.format_exc())
+                print(
+                    Fore.RED + f" XX - Backup {filename} failed. See logs." + Style.RESET_ALL
+                )
+            if config_path is not None:
+                send2trash(config_path)
 
-                        send2trash(config_path)
-
-                    elif key == "30_plexserver":
-                        try:
-                            self.archiver.backup_plex_folder(
-                                self._create_filename(target["name"].replace(" ", "")),
-                                target["path"],
-                                out_path,
-                                passwd,
-                                dict_size=target["dict_size"],
-                                mx_level=target["mx_level"],
-                                quiet=quiet,
-                            )
-                        except Exception as e:
-                            logging.error(f"backup {filename} failed. Exception: {e}")
-                            print(
-                                Fore.RED
-                                + f" XX - Backup {filename} failed. See logs."
-                                + Style.RESET_ALL
-                            )
-
-                    # elif key == '33_onenote':
-                    #     pass
-                if not quiet:
-                    print(f" >> {target['name']} saved to 7z - {filename}")
-                logging.debug(f"Backup finished for - {target['name']} - filename: {filename}")
+            if not quiet:
+                print(f" >> {target['name']} saved to 7z - {filename}")
+            logging.debug(f"Backup finished for - {target['name']} - filename: {filename}")
         if not quiet:
             print()
             print(Fore.GREEN + " >>> Saving File hashes ... " + Style.RESET_ALL)
@@ -602,7 +573,7 @@ class WinBackup:
 
     def cli_exit(self, out_path: str, start_time: datetime) -> None:
         duration = datetime.now() - start_time
-        backup_size = self.archiver._get_path_size(out_path)
+        backup_size = self.archiver._get_paths_size(out_path)
         print()
         logging.debug(f"humanize completion time {humanize.naturaldelta(duration)}")
         logging.info(f"Backup completed in {duration}")

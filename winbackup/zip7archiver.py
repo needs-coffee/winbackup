@@ -40,7 +40,7 @@ class Zip7Archiver:
         self.onenote_ex_files_path = os.path.join(real_path, "OneNoteMdExporter")
 
     @staticmethod
-    def _get_path_size(path: str) -> int:
+    def _get_size(path: str) -> int:
         """
         Calculate the size of a directory tree and return size in bytes.
         """
@@ -51,21 +51,112 @@ class Zip7Archiver:
                     total_bytes += os.path.getsize(os.path.join(path, file))
                 except Exception as e:
                     logging.error(f"Get pathsize exception - Path: {path} Exception: {e}")
-        logging.debug(f"Pathsize: {path} Size: {total_bytes}")
+        logging.debug(f"Size: {total_bytes} bytes for path: {path} ")
+        logging.debug()
         return total_bytes
+
+    def _get_paths_size(self, paths: Union[str, list]) -> int:
+        total_bytes = 0
+        if type(paths) == str:
+            total_bytes = self._get_size(paths)
+        elif type(paths) == list:
+            for path in paths:
+                total_bytes += self._get_size(path)
+        else:
+            raise TypeError("path must be str or list of str")
+        logging.debug(
+            f"Total size of paths - {total_bytes} bytes "
+            + f"({total_bytes/1048576:0.0f} MiB)",
+        )
+        return total_bytes
+
+    @staticmethod
+    def _archiver(filename: str, cmd_args: list, quiet: bool = False) -> tuple:
+        b_size_line = ""
+        a_size_line = ""
+        # run the backup task with a tqdm progress bar.
+        if filename.endswith(".tar"):
+            desc_stub = "Tarball"
+        else:
+            desc_stub = "Compress"
+        try:
+            with subprocess.Popen(
+                cmd_args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                shell=False,
+                bufsize=1,
+                universal_newlines=True,
+                errors="ignore",
+            ) as p:
+                if not quiet:
+                    with tqdm(
+                        total=100,
+                        colour="Cyan",
+                        leave=False,
+                        desc=f" {desc_stub}ing ",
+                        unit="%",
+                    ) as pbar:
+                        logging.debug("progress bar started")
+                        for (
+                            line
+                        ) in p.stdout:  # cp1252 decoded string, ignore invalid chars like 0x81
+                            if len(line.strip()) != 0:
+                                logging.debug("archive line output: " + line.strip())
+                            if "Add new data to archive: " in line:
+                                b_size_line = line.split("Add new data to archive: ")[1].strip()  # fmt: skip
+                                tqdm.write(
+                                    Fore.CYAN
+                                    + f" >> Data to {desc_stub}: {b_size_line}"
+                                    + Style.RESET_ALL
+                                )
+                                logging.debug(f"{filename} Data to {desc_stub}: {b_size_line}")
+                            if "Archive size: " in line:
+                                a_size_line = line.split("Archive size: ")[1].strip()
+                                tqdm.write(
+                                    Fore.CYAN
+                                    + f" >> {desc_stub}ed Size : {a_size_line}"
+                                    + Style.RESET_ALL
+                                )
+                                logging.debug(f"{filename} {desc_stub}ed Size: {a_size_line}")
+                            if "%" in line:
+                                pbar.update(int(line.split("%")[0].strip()) - pbar.n)
+                else:
+                    for line in p.stdout:
+                        if "Add new data to archive: " in line:
+                            b_size_line = line.split("Add new data to archive: ")[1].strip()
+                        if "Archive size: " in line:
+                            a_size_line = line.split("Archive size: ")[1].strip()
+                        if len(line.strip()) != 0:
+                            logging.debug("archive line output: " + line.strip())
+        except Exception as e:
+            logging.debug(f"Exception: {e}", exc_info=True, stack_info=True)
+            if not quiet:
+                print(
+                    Fore.RED
+                    + f" XX - Failed to archive {filename}. Set log level to debug for info."
+                    + Style.RESET_ALL
+                )
+            logging.error(f"Failed to archive {filename}. Set log level to debug for info.")
+            raise e
+        before_bytes = int(b_size_line.split("bytes")[0].split()[-1].strip())
+        after_bytes = int(a_size_line.split("bytes")[0].split()[-1].strip())
+        return before_bytes, after_bytes
 
     def backup_folder(
         self,
-        filename: str,
-        in_folder_path: Union[str, list],
+        zip_filename: str,
+        input_paths: Union[str, list],
         out_folder: str,
         password: str = "",
         dict_size: str = "192m",
         mx_level: int = 9,
         full_path: bool = False,
         split: bool = True,
-        split_force: bool = False,
         quiet: bool = False,
+        tar_before_7z: bool = False,
+        extra_tar_flags: list = [],
+        extra_7z_flags: list = [],
     ) -> tuple:
         """
         Main function for creating 7z archives.
@@ -79,248 +170,119 @@ class Zip7Archiver:
         - mx_level       : LZMA2 compression level  0-9 (9 is max)
         - full_path      : archive will store the full path to the archived files, useful if multiple directories from several volumes
         - split          : if the archives should be split into separate files if larger than FAT32 limit.
-        - split_force    : don't check if archive will be larger than FAT32 limit, just force splitting.
+        - quiet          : dont print progress
+        - tar_before_7z  : tarball input files before compressing
+        - extra_tar_flags: extra flags to pass with the tar function (if used)
+        - extra_7z_flags : extra flags to pass with the 7z function
 
         Returns:
-        - before_size, after_size : tuple of before compression size and after compression size as int
-        """  # noqa: E501
-
-        # base args for all types
-        # 7z normally disables progress reporting when output redirected, bsp1 fixes this.
-        cmd_args = [
-            self.zip7_path,
-            "a",
-            "-t7z",
-            "-m0=lzma2",
-            f"-md={dict_size}",
-            f"-mx={str(mx_level)}",
-            "-bsp1",
-        ]
-        # add additional arguments depending on function arguments
-
-        if not type(filename) == str:
+        - before_size, after_size : tuple of before/after as int in bytes
+        """
+        # validate inputs
+        if not type(zip_filename) == str:
             raise TypeError("Filename must be a string")
-
-        if type(in_folder_path) == str:
-            if not os.path.exists(in_folder_path):
+        if type(input_paths) == str:
+            if not os.path.exists(input_paths):
                 raise FileNotFoundError()
-        elif type(in_folder_path) == list:
-            for path in in_folder_path:
+        elif type(input_paths) == list:
+            for path in input_paths:
                 if not os.path.exists(path):
                     raise FileNotFoundError()
         else:
             raise TypeError("in_folder_path must be string or list")
-
         if type(out_folder) == str:
             if not os.path.exists(out_folder):
                 raise FileNotFoundError()
         else:
             raise TypeError("output path must be a string")
 
+        # 7z normally disables progress reporting when output redirected, bsp1 fixes this.
+        base_args = [
+            self.zip7_path,
+            "a",
+        ]
+        base_7z_args = [
+            "-t7z",
+            "-m0=lzma2",
+            f"-md={dict_size}",
+            f"-mx={str(mx_level)}",
+            "-bsp1",
+        ]
+        base_tar_args = [
+            "-ttar",
+            "-bsp1",
+        ]
+        zip_args = base_args + base_7z_args + extra_7z_flags
+        tar_args = base_args + base_tar_args + extra_tar_flags
+        tar_filename = zip_filename[:-3] + ".tar"
+        out_zip_path = os.path.join(out_folder, zip_filename)
+        out_tar_path = os.path.join(out_folder, tar_filename)
+        logging.debug(f"Base zip_args -> {' '.join(zip_args)}")
+        logging.debug(f"Base tar_args -> {' '.join(tar_args)}")
+        logging.debug(f"7z path       -> {out_zip_path}")
+        logging.debug(f"tar path      -> {out_tar_path}")
+
+        # get input filesize
+        path_size = self._get_paths_size(input_paths)
+
+        # parse split limit
+        split_size_bytes = 4290772992
+        logging.debug(f"Split size bytes -> {split_size_bytes:,}")
+
         # add additional flags
-        if split or split_force:
-            if split_force:
-                logging.debug(f"split_force specified - {filename} will be split.")
-                cmd_args.append("-v4092m")
+        if split:
+            # only split if input files are bigger than the split size.
+            if path_size >= split_size_bytes:
+                logging.debug(f"Path size > split limit - Splitting {zip_filename}")
+                zip_args.append("-v4092m")
             else:
-                # only split if the output directory will be larger than the volume size.
-                # Always split if a list of paths are given.
-                if type(in_folder_path) is str:
-                    path_size = self._get_path_size(in_folder_path)
-                    if path_size >= 4290772992:
-                        logging.debug(
-                            f"Splitting - {filename} is > split limit of 4092m (path size: {path_size/1048576:0.0f} MiB)."  # noqa: E501
-                        )
-                        cmd_args.append("-v4092m")
-                    else:
-                        logging.debug(
-                            f"Not Splitting - {filename} is < split limit of 4092m (path size: {path_size/1048576:0.0f} MiB)."  # noqa: E501
-                        )
-                else:
-                    logging.debug("List of paths given - Splitting.")
-                    cmd_args.append("-v4092m")
+                logging.debug(f"Path size < split limit - Not Splitting {zip_filename}")
         if len(password) != 0:
-            cmd_args.append("-mhe=on")
-            cmd_args.append(f"-p{password}")
+            zip_args.append("-mhe=on")
+            zip_args.append(f"-p{password}")
         if full_path:
-            cmd_args.append("-spf2")
+            zip_args.append("-spf2")
 
         # add output archive path
-        cmd_args.append(os.path.join(out_folder, filename))
+        tar_args.append(out_tar_path)
+        zip_args.append(out_zip_path)
 
-        # add input paths
-        if type(in_folder_path) is str:
-            cmd_args.append(in_folder_path)
-        elif type(in_folder_path) is list:
-            cmd_args += in_folder_path
+        # input paths to list
+        if type(input_paths) is str:
+            input_cmd_args = [input_paths]
+        elif type(input_paths) is list:
+            input_cmd_args = input_paths
         else:
             raise ValueError
 
-        before_size_line = ""
-        after_size_line = ""
-        # run the backup task with a tqdm progress bar.
         try:
-            with subprocess.Popen(
-                cmd_args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                shell=False,
-                bufsize=1,
-                universal_newlines=True,
-                errors="ignore",
-            ) as p:
-                if not quiet:
-                    with tqdm(
-                        total=100, colour="Cyan", leave=False, desc=" Compressing ", unit="%"
-                    ) as pbar:
-                        logging.debug("progress bar started")
-                        for (
-                            line
-                        ) in p.stdout:  # cp1252 decoded string, ignore invalid chars like 0x81
-                            if len(line.strip()) != 0:
-                                logging.debug("backup_folder line output: " + line.strip())
-                            if "Add new data to archive: " in line:
-                                before_size_line = line.split("Add new data to archive: ")[
-                                    1
-                                ].strip()
-                                tqdm.write(
-                                    Fore.CYAN
-                                    + f" >> Data to compress: {before_size_line}"
-                                    + Style.RESET_ALL
-                                )
-                                logging.debug(
-                                    f"{filename} Data to compress: {before_size_line}"
-                                )
-                            if "Archive size: " in line:
-                                after_size_line = line.split("Archive size: ")[1].strip()
-                                tqdm.write(
-                                    Fore.CYAN
-                                    + f" >> Compressed Size : {after_size_line}"
-                                    + Style.RESET_ALL
-                                )
-                                logging.debug(f"{filename} Compressed Size: {after_size_line}")
-                            if "%" in line:
-                                pbar.update(int(line.split("%")[0].strip()) - pbar.n)
-                else:
-                    for line in p.stdout:
-                        if "Add new data to archive: " in line:
-                            before_size_line = line.split("Add new data to archive: ")[
-                                1
-                            ].strip()
-                        if "Archive size: " in line:
-                            after_size_line = line.split("Archive size: ")[1].strip()
-                        if len(line.strip()) != 0:
-                            logging.debug("Backup line output: " + line.strip())
-
-        except Exception as e:
-            logging.debug(f"Exception: {e}", exc_info=True, stack_info=True)
-            if not quiet:
-                print(
-                    Fore.RED
-                    + f" XX - Failed to backup {filename}. Set log level to debug for info."
-                    + Style.RESET_ALL
-                )
-            logging.error(f"Failed to backup {filename}. Set log level to debug for info.")
-
-        before_size_bytes = int(before_size_line.split("bytes")[0].split()[-1].strip())
-        after_size_bytes = int(after_size_line.split("bytes")[0].split()[-1].strip())
-        logging.debug(
-            f"Backup size in bytes. Before: {before_size_bytes} after: {after_size_bytes}"
-        )
-        logging.info(
-            f"Backup {filename} complete. Size: {humanize.naturalsize(before_size_bytes, True)}"
-            + f" >> {humanize.naturalsize(after_size_bytes, True)}"
-            + f" (Compressed to {(after_size_bytes/before_size_bytes)*100:0.1f}% of input size)"
-        )
-
-        return before_size_bytes, after_size_bytes
-
-    def backup_plex_folder(
-        self,
-        filename: str,
-        in_folder_path: str,
-        out_folder: str,
-        password: str = "",
-        dict_size: str = "128m",
-        mx_level: int = 5,
-        quiet: bool = False,
-    ) -> tuple:
-        # From testing - backing up plex database mx9 md128m takes 10gb of ram, mx9 md192m fails memory allocation on 16gb pc.
-        # plex server files should be tarballed before compression as compressing disk files causes issues when restoring.
-        tar_filename = filename[:-3] + ".tar"
-
-        # create tar with tqdm progress bar
-        cmd_args = [
-            self.zip7_path,
-            "a",
-            "-ttar",
-            "-bsp1",
-            "-xr!Cache*",
-            "-xr!Updates",
-            "-xr!Crash*",
-            os.path.join(out_folder, tar_filename),
-            in_folder_path,
-        ]
-
-        with subprocess.Popen(
-            cmd_args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            shell=False,
-            bufsize=1,
-            universal_newlines=True,
-            errors="ignore",
-        ) as p:
-            if not quiet:
-                with tqdm(
-                    total=100, colour="Cyan", leave=False, desc=" Tarballing PMS ", unit="%"
-                ) as pbar:
-                    for line in p.stdout:
-                        if len(line.strip()) != 0:
-                            logging.debug(line.strip())
-                        if "Add new data to archive: " in line:
-                            tqdm.write(
-                                Fore.CYAN
-                                + f" >> Data to tarball : {line.split('Add new data to archive: ')[1].strip()}"
-                                + Style.RESET_ALL
-                            )
-                            logging.info(
-                                f"{filename} data to tarball: {line.split('Add new data to archive: ')[1].strip()}"
-                            )
-                        if "Archive size: " in line:
-                            tqdm.write(
-                                Fore.CYAN
-                                + f" >> Tarball Size    : {line.split('Archive size: ')[1].strip()}"
-                                + Style.RESET_ALL
-                            )
-                            logging.info(
-                                f"{filename} Tarball Size : {line.split('Archive size: ')[1].strip()}"
-                            )
-                        if "%" in line:
-                            pbar.update(int(line.split("%")[0].strip()) - pbar.n)
+            if tar_before_7z:
+                full_tar_args = tar_args + input_cmd_args
+                full_7z_args = zip_args + [out_tar_path]
+                before_tar_bytes, after_tar_bytes = self._archiver(tar_filename, full_tar_args, quiet)  # fmt: skip
+                before_7z_bytes, after_7z_bytes = self._archiver(zip_filename, full_7z_args, quiet)  # fmt: skip
+                logging.debug(f"tar size: {before_tar_bytes} -> {after_tar_bytes} bytes")
+                logging.debug(f"7z size : {before_7z_bytes} -> {after_7z_bytes} bytes")
+                try:
+                    logging.debug(f"Deleting tar from -> {out_tar_path}")
+                    send2trash(out_tar_path)
+                except Exception as e:
+                    logging.error(f"Could not delete {out_tar_path} - Exception {e}")
+                before_bytes = before_tar_bytes
+                after_bytes = after_7z_bytes
             else:
-                for line in p.stdout:
-                    if len(line.strip()) != 0:
-                        logging.debug("Backup line output: " + line.strip())
+                full_7z_args = zip_args + input_cmd_args
+                before_bytes, after_bytes = self._archiver(zip_filename, full_7z_args, quiet)
+                logging.debug(f"7z size : {before_bytes} -> {after_bytes} bytes")
+        except Exception as e:
+            raise e
 
-        # compress the tar
-        before_size, after_size = self.backup_folder(
-            filename,
-            os.path.join(out_folder, tar_filename),
-            out_folder,
-            password,
-            dict_size=dict_size,
-            mx_level=mx_level,
-            full_path=False,
-            split=True,
-            split_force=True,
-            quiet=quiet,
+        logging.info(
+            f"Backup {zip_filename} complete. Size: {humanize.naturalsize(before_bytes, True)}"
+            + f" >> {humanize.naturalsize(after_bytes, True)}"
+            + f" (Compressed to {(after_bytes/before_bytes)*100:0.1f}% of input size)"
         )
-
-        # delete the tar file
-        send2trash(os.path.join(out_folder, tar_filename))
-
-        return before_size, after_size
+        return before_bytes, after_bytes
 
     def backup_onenote_files(self, out_folder: str, password: str = "") -> None:
         """

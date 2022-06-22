@@ -50,6 +50,9 @@ class ConfigAgent:
             "dict_size": "192m",
             "mx_level": 9,
             "full_path": False,
+            "tar_before_7z": False,
+            "extra_tar_flags": [],
+            "extra_7z_flags": [],
         }
 
         self._base_target_config = {
@@ -201,6 +204,9 @@ class ConfigAgent:
                 "dict_size",
                 "mx_level",
                 "full_path",
+                "tar_before_7z",
+                "extra_7z_flags",
+                "extra_tar_flags",
             }:
                 raise ValueError(f"Key {key} in config_item not permitted.")
 
@@ -362,13 +368,22 @@ class ConfigAgent:
                 "dict_size",
                 "mx_level",
                 "full_path",
+                "tar_before_7z",
+                "extra_7z_flags",
+                "extra_tar_flags",
+            }
+            required_keys = {
+                "name",
+                "type",
+                "path",
+                "enabled",
             }
             for key, value in config_item.items():
                 if key not in valid_keys:
-                    logging.warning(
-                        f"Unknown Key {key} in config_item for {id}. This will be ignored."
-                    )
+                    logging.warning(f"Unknown Key {key} in config_item for {id}. This will be ignored.")  # fmt: skip
                     print(f"Unknown Key {key} in config_item for {id}. This will be ignored.")
+                if key in required_keys:
+                    required_keys.remove(key)
                 if key in valid_keys:
                     valid_keys.remove(key)
                 # check valid key types
@@ -386,16 +401,24 @@ class ConfigAgent:
                     if type(value) not in {str, list}:
                         valid_type = False
                 if not valid_type:
-                    logging.error(
-                        f"Invalid type ({type(value)} for {key} in config_item for {id}."
-                    )
+                    logging.error(f"Invalid type ({type(value)} for {key} in config_item for {id}.")  # fmt: skip
                     print(f"Invalid type ({type(value)} for {key} in config_item for {id}.")
                     valid_config_flag = False
 
-            if len(valid_keys) != 0:
-                logging.error(f"Required keys {valid_keys} not in config_item for {id}.")
+            if len(required_keys) != 0:
                 print(f"Required keys {valid_keys} not in config_item for {id}.")
+                logging.error(f"Required keys {valid_keys} not in config_item for {id}.")
                 valid_config_flag = False
+            if len(valid_keys) != 0:
+                print(f"Keys {valid_keys} not in config_item for {id}.")
+                print("Missing keys will be filled with default values")
+                logging.warning(f"Valid keys {valid_keys} not in config_item for {id}.")
+                logging.warning("Missing keys will be filled with default values")
+                for key in valid_keys:
+                    base_config = self._base_config_item.copy()
+                    config_item[key] = base_config[key]
+                    logging.info(f"  {key} for {id} set to default of {base_config[key]}")
+                    print(f"  {key} for {id} set to default of {base_config[key]}")
 
             ## check mx_level within 0-9
             if "mx_level" in config_item:
