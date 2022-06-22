@@ -681,7 +681,12 @@ class WinBackup:
             )
             sys.exit(1)
 
-    def run_from_config_file(self, path: str, quiet: bool = False) -> None:
+    def run_from_config_file(
+        self,
+        path: str,
+        quiet: bool = False,
+        auto_confirm: bool = False,
+    ) -> None:
         if path:
             if os.path.exists(path) and path.lower().endswith((".yaml", ".yml")):
                 logging.debug("Valid config path given")
@@ -718,7 +723,12 @@ class WinBackup:
             )
             sys.exit(1)
 
-        self.cli(self.config_agent.output_root_dir, config_set=True, quiet=quiet)
+        self.cli(
+            self.config_agent.output_root_dir,
+            config_set=True,
+            quiet=quiet,
+            auto_confirm=auto_confirm,
+        )
 
     def cli(
         self,
@@ -726,6 +736,7 @@ class WinBackup:
         config_set: bool = False,
         all_selected: bool = False,
         quiet: bool = False,
+        auto_confirm: bool = False,
     ) -> None:
         signal.signal(signal.SIGINT, self._ctrl_c_handler)
         logging.debug("sigint connected to ctrl_c_handler")
@@ -801,7 +812,7 @@ class WinBackup:
             self.config_agent.encryption_password,
             self.path_created,
         )
-        if not quiet:
+        if not auto_confirm:
             if not self._yes_no_prompt("Do you want to continue?"):
                 logging.info("Backup cancelled after summary. Exiting.")
                 print(" Aborted. Exiting.")

@@ -47,7 +47,8 @@ def get_cli_args() -> dict:
     parser.add_argument("-a", "--all", help="Backup all options selectable.", action="store_true")
     parser.add_argument("-c", "--configfile", help="supply a configuration file.", action="store_true")
     parser.add_argument("-C", "--create-configfile", help="Generate default configuration file. If no path given will save to CWD.", action="store_true")
-    parser.add_argument("-q", "--quiet", help="Run without confirmation. Defaults to no password if not run with config file.", action="store_true")
+    parser.add_argument("-q", "--quiet", help="Minimal terminal output.", action="store_true")
+    parser.add_argument("-y", "--autoconfirm", help="Run without confirmation. Defaults to no password if not run with config file.", action="store_true")
     parser.add_argument("-i", "--interactive-config", help="Generate a configuration file interactively", action="store_true")
     parser.add_argument("-v", "--verbose", help="Enable verbose logging. Log will initially output to the CWD.", action="store_true")
     parser.add_argument("-V", "--version", action="version", version=__version__)
@@ -71,7 +72,11 @@ def cli():
 
     win_backup = winbackup.WinBackup(log_level)
     if cli_args["configfile"]:
-        win_backup.run_from_config_file(path, quiet=cli_args["quiet"])
+        win_backup.run_from_config_file(
+            path,
+            quiet=cli_args["quiet"],
+            auto_confirm=cli_args["autoconfirm"],
+        )
     elif cli_args["create_configfile"]:
         win_backup.generate_blank_configfile(path)
     elif cli_args["interactive_config"]:
@@ -81,6 +86,7 @@ def cli():
             path,
             all_selected=cli_args["all"],
             quiet=cli_args["quiet"],
+            auto_confirm=cli_args["autoconfirm"],
         )
 
 
