@@ -566,7 +566,7 @@ class WinBackup:
 
                     elif key == "30_plexserver":
                         try:
-                            self.archiver.backup_plex_folder(
+                            self.archiver.backup_folder(
                                 self._create_filename(target["name"].replace(" ", "")),
                                 target["path"],
                                 out_path,
@@ -574,6 +574,8 @@ class WinBackup:
                                 dict_size=target["dict_size"],
                                 mx_level=target["mx_level"],
                                 quiet=quiet,
+                                tar_before_7z=True,
+                                extra_tar_flags=["-xr!Cache*", "-xr!Updates", "-xr!Crash*"],
                             )
                         except Exception as e:
                             logging.error(f"backup {filename} failed. Exception: {e}")
