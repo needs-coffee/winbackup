@@ -51,20 +51,24 @@ class Zip7Archiver:
                     total_bytes += os.path.getsize(os.path.join(path, file))
                 except Exception as e:
                     logging.error(f"Get pathsize exception - Path: {path} Exception: {e}")
-        logging.debug(f"Pathsize: {path} Size: {total_bytes} bytes")
+        logging.debug(f"Size: {total_bytes} bytes for path: {path} ")
+        logging.debug()
         return total_bytes
 
     def _get_paths_size(self, paths: Union[str, list]) -> int:
+        total_bytes = 0
         if type(paths) == str:
-            return self._get_size(paths)
+            total_bytes = self._get_size(paths)
         elif type(paths) == list:
-            total_bytes = 0
             for path in paths:
                 total_bytes += self._get_size(path)
-            logging.debug(f"Total size of list of paths - {total_bytes} bytes")
-            return total_bytes
         else:
             raise TypeError("path must be str or list of str")
+        logging.debug(
+            f"Total size of paths - {total_bytes} bytes "
+            + f"({total_bytes/1048576:0.0f} MiB)",
+        )
+        return total_bytes
 
     @staticmethod
     def _archiver(filename: str, cmd_args: list, quiet: bool = False) -> tuple:
@@ -213,18 +217,16 @@ class Zip7Archiver:
         tar_filename = zip_filename[:-3] + ".tar"
         out_zip_path = os.path.join(out_folder, zip_filename)
         out_tar_path = os.path.join(out_folder, tar_filename)
-        logging.debug(f"Base zip_args -> {''.join(zip_args)}")
-        logging.debug(f"Base tar_args -> {''.join(tar_args)}")
+        logging.debug(f"Base zip_args -> {' '.join(zip_args)}")
+        logging.debug(f"Base tar_args -> {' '.join(tar_args)}")
         logging.debug(f"7z path       -> {out_zip_path}")
         logging.debug(f"tar path      -> {out_tar_path}")
 
         # get input filesize
         path_size = self._get_paths_size(input_paths)
-        logging.debug(f"Path Size        -> {path_size/1048576:0.0f} MiB")
 
         # parse split limit
         split_size_bytes = 4290772992
-        logging.debug(f"Split size bytes -> {split_size_bytes:,}")
         logging.debug(f"Split size bytes -> {split_size_bytes:,}")
 
         # add additional flags
