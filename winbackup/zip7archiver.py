@@ -79,6 +79,7 @@ class Zip7Archiver:
         else:
             desc_stub = "Compress"
         try:
+            logging.debug(f"cli args - {' '.join(cmd_args)}")
             with subprocess.Popen(
                 cmd_args,
                 stdout=subprocess.PIPE,
@@ -162,7 +163,7 @@ class Zip7Archiver:
         Uses TQDM to display the progress to the console.
         Parameters:
         - filename       : filename of the created archive
-        - in_folder_path : string or list - path(s) of the folder to be added to the archive
+        - input_paths    : string or list - path(s) of the folder to be added to the archive
         - out_folder     : where the 7z files are output
         - password       : optional password for AES encryption - if empty string encryption is disabled
         - dict_size      : string representing the LZMA2 dictionary size
@@ -188,7 +189,7 @@ class Zip7Archiver:
                 if not os.path.exists(path):
                     raise FileNotFoundError()
         else:
-            raise TypeError("in_folder_path must be string or list")
+            raise TypeError("input_paths must be string or list")
         if type(out_folder) == str:
             if not os.path.exists(out_folder):
                 raise FileNotFoundError()
@@ -226,7 +227,7 @@ class Zip7Archiver:
 
         # parse split limit
         split_size_bytes = 4290772992
-        logging.debug(f"Split size bytes -> {split_size_bytes:,}")
+        logging.debug(f"Archive Split size -> {split_size_bytes:,} bytes")
 
         # add additional flags
         if split:
@@ -246,7 +247,7 @@ class Zip7Archiver:
         tar_args.append(out_tar_path)
         zip_args.append(out_zip_path)
 
-        # input paths to list
+        # convert input paths to list
         if type(input_paths) is str:
             input_cmd_args = [input_paths]
         elif type(input_paths) is list:
@@ -260,8 +261,8 @@ class Zip7Archiver:
                 full_7z_args = zip_args + [out_tar_path]
                 before_tar_bytes, after_tar_bytes = self._archiver(tar_filename, full_tar_args, quiet)  # fmt: skip
                 before_7z_bytes, after_7z_bytes = self._archiver(zip_filename, full_7z_args, quiet)  # fmt: skip
-                logging.debug(f"tar size: {before_tar_bytes} -> {after_tar_bytes} bytes")
-                logging.debug(f"7z size : {before_7z_bytes} -> {after_7z_bytes} bytes")
+                logging.debug(f"tar size: {before_tar_bytes} --> {after_tar_bytes} bytes")
+                logging.debug(f"7z size : {before_7z_bytes} --> {after_7z_bytes} bytes")
                 try:
                     logging.debug(f"Deleting tar from -> {out_tar_path}")
                     send2trash(out_tar_path)
