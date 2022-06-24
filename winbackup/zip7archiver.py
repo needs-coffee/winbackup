@@ -201,13 +201,20 @@ class Zip7Archiver:
             self.zip7_path,
             "a",
         ]
-        base_7z_args = [
-            "-t7z",
-            "-m0=lzma2",
-            f"-md={dict_size}",
-            f"-mx={str(mx_level)}",
-            "-bsp1",
-        ]
+        if mx_level == 0:
+            base_7z_args = [
+                "-t7z",
+                "-mx=0",
+                "-bsp1",
+            ]
+        else:
+            base_7z_args = [
+                "-t7z",
+                "-m0=lzma2",
+                f"-md={dict_size}",
+                f"-mx={str(mx_level)}",
+                "-bsp1",
+            ]
         base_tar_args = [
             "-ttar",
             "-bsp1",
