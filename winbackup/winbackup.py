@@ -632,6 +632,12 @@ class WinBackup:
         if not len(password) == 0:
             self.config_agent.encryption_password = password
             self.config_agent.global_config["encryption_enabled"] = True
+            if len(password) <= 12:
+                print(
+                    Fore.YELLOW
+                    + " !! CAUTION - The given password is short. Consider a longer password."
+                    + Style.RESET_ALL
+                )
         try:
             save_path = self.config_agent.save_YAML_config(target_path)
             logging.debug(f"Interactive Configuration successfully saved to: {save_path}")
