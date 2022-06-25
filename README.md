@@ -4,7 +4,8 @@
 
 A python package to back up user files on Windows to 7z archives. Useful for offsite or cloud backups and backups can be optionally encrypted with AES256. Archives can be Optionally split archives into smaller archives for easier management. As well as user files can backup Plex Media Server, Hyper-V Virtual Machines and VirtualBox Virtual Machines.
 
-- embeds 7za to perform compression
+- embeds 7z to perform compression
+- saves lists of installed programs and drivers
 - optional AES256 encryption
 - Archives produced are full backups - no incremental backups at present
 - Archives saved in the format - host_user_yyyy-mm-dd_folder.7z
@@ -33,6 +34,22 @@ or ```winbackup --create-configfile```. This config file must be modified before
 
 To generate a configuration file interactively run ```winbackup -i``` or ```winbackup --interactive-config```. This file can be run without modification for later use.
 
+Full CLI options
+----------------
+
+Available CLI options.
+
+Flag | Option                | Desc                                                              |
+-----|-----------------------|-------------------------------------------------------------------|
+`-a` | `--all`               | Run backup with all possible backup targets selected              |
+`-c` | `--configfile`        | Run backup from a supplied yaml config file                       |
+`-C` | `--create-configfile` | Create a default configuration file template. Will need modified before being run.
+`-h` | `--help`              | Displays help information
+`-i` | `--interactive-config`| Generate a configuration file interactively, can be run directly after generation 
+`-q` | `--quiet`             | Minimal terminal output                                           |
+`-v` | `--verbose`           | Sets logging to debug. Only affects log file not stdout.          |
+`-V` | `--version`           | Print version info.                                               |
+`-y` | `--autoconfirm`       | Autoconfirm prompts                                               |
 Tests
 -----
 To run unitests

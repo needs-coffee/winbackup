@@ -47,11 +47,11 @@ def get_cli_args() -> dict:
     parser.add_argument("-a", "--all", help="Backup all options selectable.", action="store_true")
     parser.add_argument("-c", "--configfile", help="supply a configuration file.", action="store_true")
     parser.add_argument("-C", "--create-configfile", help="Generate default configuration file. If no path given will save to CWD.", action="store_true")
-    parser.add_argument("-q", "--quiet", help="Minimal terminal output.", action="store_true")
-    parser.add_argument("-y", "--autoconfirm", help="Run without confirmation. Defaults to no password if not run with config file.", action="store_true")
     parser.add_argument("-i", "--interactive-config", help="Generate a configuration file interactively", action="store_true")
+    parser.add_argument("-q", "--quiet", help="Minimal terminal output.", action="store_true")
     parser.add_argument("-v", "--verbose", help="Enable verbose logging. Log will initially output to the CWD.", action="store_true")
     parser.add_argument("-V", "--version", action="version", version=__version__)
+    parser.add_argument("-y", "--autoconfirm", help="Run without confirmation. Defaults to no password if not run with config file.", action="store_true")
     args = vars(parser.parse_args())
     return args
     # fmt: on
