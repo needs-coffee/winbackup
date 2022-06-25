@@ -16,58 +16,79 @@
 
 import sys
 import logging
+import platform
 from argparse import ArgumentParser, RawTextHelpFormatter
 from . import __version__, __license__, __copyright__
 from . import winbackup
 
 DEFAULT_LOG_LEVEL = logging.INFO
 
-def get_commandline_arguments() -> dict:
+
+def get_cli_args() -> dict:
     """
     Parse command line arguments.
     """
     helpstring = """
-    Backupscript for windows.
+    Backups for windows.
     Backs up user folders to 7z archives.
     Can also back up Plex Media Server, Hyper-V VMs and VirtualBox VMs
-    
-    winbackup version {}
-    This program comes with ABSOLUTELY NO WARRANTY. 
-    This is free software, and you are welcome to redistribute it 
-    under certain conditions, see the GPLv3 Licence file attached.
-    {} - Licence: {} """.format(__version__, __copyright__, __license__)
 
+    winbackup version {}
+    This program comes with ABSOLUTELY NO WARRANTY.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions, see the GPLv3 Licence file attached.
+    {} - Licence: {} """.format(
+        __version__, __copyright__, __license__
+    )
+
+    # fmt: off
     parser = ArgumentParser(description=helpstring, formatter_class=RawTextHelpFormatter)
     parser.add_argument("path", type=str, help="The Path that should contain the backup", nargs="?")
-    parser.add_argument('-a', '--all', help="Backup all options selectable.", action="store_true")
-    parser.add_argument('-c', '--configfile', help="supply a configuration file.", action="store_true")
-    parser.add_argument('-C', '--create-configfile', help="Generate default configuration file. If no path given will save to CWD.", action="store_true")
-    parser.add_argument('-i', '--interactive-config', help="Generate a configuration file interactively", action="store_true")
-    parser.add_argument('-v', '--verbose', help="Enable verbose logging. Log will initially output to the CWD.", action="store_true") #?store_const
-    parser.add_argument('-V', '--version', action='version', version=__version__)
+    parser.add_argument("-a", "--all", help="Backup all options selectable.", action="store_true")
+    parser.add_argument("-c", "--configfile", help="supply a configuration file.", action="store_true")
+    parser.add_argument("-C", "--create-configfile", help="Generate default configuration file. If no path given will save to CWD.", action="store_true")
+    parser.add_argument("-i", "--interactive-config", help="Generate a configuration file interactively", action="store_true")
+    parser.add_argument("-q", "--quiet", help="Minimal terminal output.", action="store_true")
+    parser.add_argument("-v", "--verbose", help="Enable verbose logging. Log will initially output to the CWD.", action="store_true")
+    parser.add_argument("-V", "--version", action="version", version=__version__)
+    parser.add_argument("-y", "--autoconfirm", help="Run without confirmation. Defaults to no password if not run with config file.", action="store_true")
     args = vars(parser.parse_args())
     return args
+    # fmt: on
 
 
 def cli():
-    cli_args = get_commandline_arguments()
-    
-    path = cli_args['path']
-    if cli_args['verbose']:
+    cli_args = get_cli_args()
+
+    if not platform.system() == "Windows":
+        print(" Only Windows is supported by this program.")
+        sys.exit(1)
+
+    path = cli_args["path"]
+    if cli_args["verbose"]:
         log_level = logging.DEBUG
     else:
         log_level = DEFAULT_LOG_LEVEL
 
     win_backup = winbackup.WinBackup(log_level)
-    if cli_args['configfile']:
-        win_backup.run_from_config_file(path)
-    elif cli_args['create_configfile']:
+    if cli_args["configfile"]:
+        win_backup.run_from_config_file(
+            path,
+            quiet=cli_args["quiet"],
+            auto_confirm=cli_args["autoconfirm"],
+        )
+    elif cli_args["create_configfile"]:
         win_backup.generate_blank_configfile(path)
-    elif cli_args['interactive_config']:
-        win_backup.interactive_config_builder(path)
+    elif cli_args["interactive_config"]:
+        win_backup.interactive_config_builder(path, all_selected=cli_args["all"])
     else:
-        win_backup.cli(path)
-    
+        win_backup.cli(
+            path,
+            all_selected=cli_args["all"],
+            quiet=cli_args["quiet"],
+            auto_confirm=cli_args["autoconfirm"],
+        )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(cli())
